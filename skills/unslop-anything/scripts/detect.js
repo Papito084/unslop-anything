@@ -1465,11 +1465,15 @@ function main(argv) {
         return 1;
       }
     } else if (a === "--ignore") {
-      if (!args[i + 1]) {
-        console.error(USAGE);
+      const value = args[i + 1];
+      if (!value || value.startsWith("--")) {
+        console.error(
+          "Missing value for --ignore. Pass rule ids separated by commas; see --list-rules."
+        );
         return 1;
       }
-      ignoreRules.push(...args[++i].split(","));
+      i++;
+      ignoreRules.push(...value.split(","));
     } else if (!a.startsWith("--")) targets.push(a);
     else if (!["--json", "--include-tests"].includes(a)) {
       console.error(`Unknown option ${a}\n\n${USAGE}`);

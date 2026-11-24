@@ -226,6 +226,29 @@ test("--fail-on chooses which severity fails the scan", () => {
   }
 });
 
+test("--ignore errors cleanly when value is missing or followed by another flag", () => {
+  const err = console.error;
+  let errOut = "";
+  console.error = (m) => {
+    errOut += m;
+  };
+  try {
+    assert.strictEqual(main([path.join(fixtures, "slop"), "--ignore"]), 1);
+    assert.strictEqual(
+      errOut,
+      "Missing value for --ignore. Pass rule ids separated by commas; see --list-rules."
+    );
+    errOut = "";
+    assert.strictEqual(main([path.join(fixtures, "slop"), "--ignore", "--json"]), 1);
+    assert.strictEqual(
+      errOut,
+      "Missing value for --ignore. Pass rule ids separated by commas; see --list-rules."
+    );
+  } finally {
+    console.error = err;
+  }
+});
+
 test("--list-rules shows stacks and platforms, and --json includes them", () => {
   const log = console.log;
   let out = "";
