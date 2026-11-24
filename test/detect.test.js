@@ -1127,3 +1127,18 @@ test("glass-everywhere counts Tailwind backdrop-blur classes", () => {
   ].join("\n");
   assert.deepStrictEqual(scanSource(withNone, "a.tsx"), []);
 });
+
+test("drawer-nav catches both line.3.horizontal and older line.horizontal.3 SF Symbols", () => {
+  assert.deepStrictEqual(
+    scanSource('Image(systemName: "line.3.horizontal")', "Menu.swift").map((f) => f.rule),
+    ["drawer-nav"],
+  );
+  assert.deepStrictEqual(
+    scanSource('Image(systemName: "line.horizontal.3")', "Menu.swift").map((f) => f.rule),
+    ["drawer-nav"],
+  );
+  assert.deepStrictEqual(
+    scanSource("// Use line.horizontal.3 in prose without quotes", "Menu.swift"),
+    [],
+  );
+});
