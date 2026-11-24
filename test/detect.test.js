@@ -1127,3 +1127,27 @@ test("glass-everywhere counts Tailwind backdrop-blur classes", () => {
   ].join("\n");
   assert.deepStrictEqual(scanSource(withNone, "a.tsx"), []);
 });
+
+test("tracked-caps-label catches leading-dot Tailwind tracking and rem letter-spacing", () => {
+  assert.deepStrictEqual(
+    scanSource('<p className="uppercase tracking-[.2em]">Features</p>', "Eyebrow.tsx").map((f) => f.rule),
+    ["tracked-caps-label"],
+  );
+  assert.deepStrictEqual(
+    scanSource('<p className="uppercase tracking-[0.2em]">Features</p>', "Eyebrow.tsx").map((f) => f.rule),
+    ["tracked-caps-label"],
+  );
+
+  assert.deepStrictEqual(
+    scanSource(".eyebrow { text-transform: uppercase; letter-spacing: 0.12rem; }", "eyebrow.css").map((f) => f.rule),
+    ["tracked-caps-label"],
+  );
+  assert.deepStrictEqual(
+    scanSource(".eyebrow { text-transform: uppercase; letter-spacing: 0.05rem; }", "eyebrow.css").map((f) => f.rule),
+    ["tracked-caps-label"],
+  );
+  assert.deepStrictEqual(
+    scanSource(".eyebrow { text-transform: uppercase; letter-spacing: 0.01rem; }", "eyebrow.css"),
+    [],
+  );
+});
