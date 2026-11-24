@@ -998,14 +998,16 @@ const rules = [
       for (const m of matches(/<(?:div|span|li|td|img|a)\b[^<>]*?\s(?:onClick|@click|v-on:click|on:click)\s*=/, code)) {
         const end = tagEnd(code, m.index + m[0].length);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
-        if (/^<a\b/.test(tag)) {
-          // An anchor is a real link only when it has an href; a bare
-          // <a onClick> is not focusable and is not announced as a control.
-          // The one escape hatch is a button role with a tabIndex, which
-          // makes it behave like a button for keyboard and screen readers.
-          if (/(?:^|[\s{:[])href\]?\s*=/.test(tag)) continue;
-          if (/\brole\s*=\s*["'{]*button/.test(tag) && /\btab[iI]ndex\s*=/.test(tag)) continue;
-        } else if (/\brole\s*=|\btab[iI]ndex\s*=/.test(tag)) continue;
+        if (/^<a\b/.test(tag) && /(?:^|[\s{:[])href\]?\s*=/.test(tag)) continue;
+        // A non-semantic clickable element (or href-less anchor) is only
+        // keyboard- and screen-reader-accessible when it has both an
+        // interactive ARIA role and a tabIndex.
+        if (
+          /\brole\s*=\s*["'{`]*\s*(?:button|link|checkbox|menuitem(?:checkbox|radio)?|option|radio|switch|tab|textbox|combobox|gridcell|searchbox|slider|spinbutton|treeitem)\b/.test(tag) &&
+          /\btab[iI]ndex\s*=/.test(tag)
+        ) {
+          continue;
+        }
         hits.push(m.index);
       }
       return hits;

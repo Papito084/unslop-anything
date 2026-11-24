@@ -717,6 +717,23 @@ test("clickable-div flags a href-less anchor with onClick", () => {
   assert.deepStrictEqual(findingsFor('<a onClick={go} tabIndex={0}>Go</a>\n').map((f) => f.rule), ["clickable-div"]);
 });
 
+test("clickable-div requires both an interactive role and tabIndex on div/span/li/td/img", () => {
+  const rulesFor = (src, file = "a.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor('<div role="button" onClick={open}>Open</div>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<div tabIndex={0} onClick={open}>Open</div>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<div role="presentation" tabIndex={0} onClick={open}>Open</div>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<div role="none" tabIndex={0} onClick={open}>Open</div>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<li role="listitem" tabIndex={0} onClick={open}>Open</li>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<img role="img" tabIndex={0} onClick={open} alt="Open" />\n'), ["clickable-div"]);
+  // Interactive role + tabIndex stays quiet across JSX, Vue, and Svelte.
+  assert.deepStrictEqual(rulesFor('<div role="button" tabIndex={0} onClick={open}>Open</div>\n'), []);
+  assert.deepStrictEqual(rulesFor('<div role="button" :tabindex="0" @click="open">Open</div>\n', "A.vue"), []);
+  assert.deepStrictEqual(rulesFor('<div role="button" tabindex="0" on:click={open}>Open</div>\n', "A.svelte"), []);
+});
+
 test("focus-removed flags a bare focus:outline-none, not one with a ring replacement", () => {
   const rulesFor = (src) => scanSource(src, "a.tsx").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<input className="focus:outline-none" />\n'), ["focus-removed"]);
