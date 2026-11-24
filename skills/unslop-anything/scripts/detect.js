@@ -951,12 +951,14 @@ const rules = [
     severity: "minor",
     stacks: ["js", "web", "css"],
     message: "Animation with no prefers-reduced-motion fallback (first use in this file).",
-    fix: "Add a @media (prefers-reduced-motion: reduce) fallback that stops the animation, or guard the class with a motion-reduce: variant.",
+    fix: "Add a @media (prefers-reduced-motion: reduce) fallback, guard the class with a motion-reduce: variant, or check useReducedMotion() / AccessibilityInfo in JS.",
     find({ code }) {
       // Reported once per file, like transition-all: a missing fallback
       // is usually a habit, not a one-off. A fallback anywhere in the
       // file covers it, so the check is file-wide.
-      if (/prefers-reduced-motion/.test(code)) return [];
+      if (/prefers-reduced-motion|\breduceMotionChanged\b/.test(code)) return [];
+      const unquoted = code.replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`/g, '""');
+      if (/\buseReducedMotion(?:Config)?\s*\(|\bAccessibilityInfo\.isReduceMotionEnabled\b|\bReduceMotion\./.test(unquoted)) return [];
       const hits = [];
       // Plain CSS: the first @keyframes block or animation: declaration.
       const css = matches(/@keyframes\b|\banimation\s*:\s*["'`]?(?!none\b)[^;"'`\n]*?\d*\.?\d+m?s\b/, code).next();

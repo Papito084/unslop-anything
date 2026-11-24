@@ -359,6 +359,32 @@ test("reduced-motion flags animations with no prefers-reduced-motion fallback (i
   assert.deepStrictEqual(scanSource('<Stack.Screen options={{ animation: "slide_from_right" }} />\n', "a.tsx"), []);
   assert.deepStrictEqual(scanSource("const options = { animation: false };\n", "a.ts"), []);
   assert.deepStrictEqual(scanSource('const Badge = styled.span`animation: ${bounce} 1s infinite;`;\n', "a.tsx").map((f) => f.rule), ["reduced-motion"]);
+  // JS reduced-motion guards (framer-motion, Reanimated, React Native) silence it.
+  assert.deepStrictEqual(
+    scanSource('import { useReducedMotion } from "framer-motion";\nexport function Hero() { const r = useReducedMotion(); return <div className={r ? "" : "animate-bounce"} />; }\n', "Hero.tsx"),
+    [],
+  );
+  assert.deepStrictEqual(
+    scanSource('import { useReducedMotionConfig, ReduceMotion } from "react-native-reanimated";\nexport function Card() { const r = useReducedMotionConfig(); return <div className="animate-bounce" />; }\n', "Card.tsx"),
+    [],
+  );
+  assert.deepStrictEqual(
+    scanSource('const mode = ReduceMotion.System;\nexport const X = () => <div className="animate-bounce" />;\n', "Card.tsx"),
+    [],
+  );
+  assert.deepStrictEqual(
+    scanSource('AccessibilityInfo.isReduceMotionEnabled().then(setReduce);\nexport const X = () => <div className="animate-bounce" />;\n', "Card.tsx"),
+    [],
+  );
+  assert.deepStrictEqual(
+    scanSource('AccessibilityInfo.addEventListener("reduceMotionChanged", setReduce);\nexport const X = () => <div className="animate-bounce" />;\n', "Card.tsx"),
+    [],
+  );
+  // Comments or strings mentioning useReducedMotion do not count as a fallback.
+  assert.deepStrictEqual(
+    scanSource('// useReducedMotion()\nconst label = "useReducedMotion()";\nexport const X = () => <div className="animate-bounce" />;\n', "Hero.tsx").map((f) => f.rule),
+    ["reduced-motion"],
+  );
 });
 
 test("slop-gradient reads Android #AARRGGBB colors", () => {
