@@ -1046,12 +1046,13 @@ const rules = [
     stacks: ["js", "web"],
     message: "Image without alt text.",
     fix: "Describe what the image shows, or use alt=\"\" for pure decoration.",
-    find({ code }) {
+    find({ code, stack }) {
       const hits = [];
       for (const m of matches(/<(?:img|Image)(?=[\s/>])/, code)) {
         const end = tagEnd(code, m.index);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
         if (tag.startsWith("<Image") && !/\ssrc\s*=/.test(tag)) continue;
+        if (stack === "web" && /\salt(?=[\s/>]|$)/.test(tag)) continue;
         if (!/[\s:\[.]alt\]?\s*=|\{\s*alt\s*\}|\{\s*\.\.\./.test(tag)) hits.push(m.index);
       }
       return hits;

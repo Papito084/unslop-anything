@@ -818,6 +818,21 @@ test("img-no-alt accepts Angular [alt] bindings and Svelte {alt} shorthand", () 
   assert.deepStrictEqual(rulesFor("<img {src} />\n", "A.svelte"), ["img-no-alt"]);
 });
 
+test("img-no-alt accepts bare alt attribute in web templates and flags it in JSX", () => {
+  const rulesFor = (src, file) => scanSource(src, file).map((f) => f.rule);
+  // Issue #126: HTML decorative images with bare alt (empty alt).
+  assert.deepStrictEqual(rulesFor('<img src="divider.png" alt>\n', "index.html"), []);
+  assert.deepStrictEqual(rulesFor('<img src="divider.png" alt />\n', "index.html"), []);
+  assert.deepStrictEqual(rulesFor('<img alt src="divider.png">\n', "index.html"), []);
+  assert.deepStrictEqual(rulesFor('<img src="divider.png" alt>\n', "a.vue"), []);
+  assert.deepStrictEqual(rulesFor('<img src="divider.png" alt>\n', "a.svelte"), []);
+  assert.deepStrictEqual(rulesFor('<img src="divider.png" alt>\n', "a.astro"), []);
+  // JSX treats <img alt /> as alt={true}, which is not useful alt text.
+  assert.deepStrictEqual(rulesFor('<img src="divider.png" alt />\n', "App.tsx"), ["img-no-alt"]);
+  // HTML without alt is still flagged.
+  assert.deepStrictEqual(rulesFor('<img src="photo.png">\n', "index.html"), ["img-no-alt"]);
+});
+
 test("placeholder-label flags inputs that use a placeholder as their only label", () => {
   const rulesFor = (src) => scanSource(src, "a.tsx").map((f) => f.rule);
   // The issue's repro.
