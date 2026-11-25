@@ -325,6 +325,12 @@ test("transition-all flags `all` anywhere in a transition list", () => {
   assert.deepStrictEqual(scanSource(named, "a.css"), []);
 });
 
+test("Less stylesheets are scanned as css", () => {
+  // Issue #125: .less files use css stack rules like transition-all.
+  const src = ".card {\n  transition: all 0.3s;\n}\n";
+  assert.deepStrictEqual(scanSource(src, "styles.less").map((f) => f.rule), ["transition-all"]);
+});
+
 test("vague-button catches Swift, Compose and Flutter buttons", () => {
   assert.deepStrictEqual(scanSource('Button("Submit") { save() }', "a.swift").map((f) => f.rule), ["vague-button"]);
   assert.deepStrictEqual(scanSource('Button(onClick = {}) { Text("Submit") }', "a.kt").map((f) => f.rule), ["vague-button"]);
