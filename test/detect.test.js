@@ -571,6 +571,66 @@ test("a config from before the rename is still read", () => {
   }
 });
 
+test("a malformed config file stops the scan with an error naming the file", () => {
+  // Issue #127: syntax errors in config must not be silently swallowed.
+  const fs = require("fs");
+  const os = require("os");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "unslop-"));
+  const cfgDir = path.join(root, ".unslop-anything");
+  fs.mkdirSync(cfgDir);
+  const cfgFile = path.join(cfgDir, "config.json");
+  fs.writeFileSync(cfgFile, '{\n  "ignoreRules": ["transition-all"],\n}\n');
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "A.ts"), "const a = 1;\n");
+  try {
+    assert.throws(
+      () => scan([path.join(root, "src")]),
+      (err) => err.message.includes(cfgFile) && /parse|JSON/i.test(err.message)
+    );
+    let errOut = "";
+    const origErr = console.error;
+    console.error = (msg) => { errOut += msg + "\n"; };
+    try {
+      assert.strictEqual(main([path.join(root, "src")]), 1);
+      assert.ok(errOut.includes(cfgFile));
+    } finally {
+      console.error = origErr;
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("unknown rule in config file is rejected with an error naming the file", () => {
+  // Issue #127: config typos in ignoreRules get the same error naming the file.
+  const fs = require("fs");
+  const os = require("os");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "unslop-"));
+  const cfgDir = path.join(root, ".unslop-anything");
+  fs.mkdirSync(cfgDir);
+  const cfgFile = path.join(cfgDir, "config.json");
+  fs.writeFileSync(cfgFile, JSON.stringify({ ignoreRules: ["transition-al"] }));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "A.ts"), "const a = 1;\n");
+  try {
+    assert.throws(
+      () => scan([path.join(root, "src")]),
+      (err) => err.message.includes(cfgFile) && err.message.includes("Unknown rule") && err.message.includes("transition-al")
+    );
+    let errOut = "";
+    const origErr = console.error;
+    console.error = (msg) => { errOut += msg + "\n"; };
+    try {
+      assert.strictEqual(main([path.join(root, "src")]), 1);
+      assert.ok(errOut.includes(cfgFile) && errOut.includes("Unknown rule") && errOut.includes("transition-al"));
+    } finally {
+      console.error = origErr;
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("an unreadable file makes the scan fail, not pass", () => {
   const fs = require("fs");
   const os = require("os");

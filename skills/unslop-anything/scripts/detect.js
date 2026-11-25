@@ -1218,13 +1218,30 @@ function loadConfig(root) {
     if (path.dirname(dir) === dir) break;
   }
   candidates.push(path.join(process.cwd(), ".unslop-anything", "config.json"), path.join(process.cwd(), ".unslopovich", "config.json"));
+  const seen = new Set();
   for (const file of candidates) {
+    if (seen.has(file)) continue;
+    seen.add(file);
+    if (!fs.existsSync(file)) continue;
+    let content;
     try {
-      const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-      return { ignoreRules: raw.ignoreRules || [], ignorePaths: raw.ignorePaths || [] };
-    } catch {
-      // No config, or unreadable: use defaults.
+      content = fs.readFileSync(file, "utf8");
+    } catch (err) {
+      throw new Error(`Could not read ${file}: ${err.message}`);
     }
+    let raw;
+    try {
+      raw = JSON.parse(content);
+    } catch (err) {
+      throw new Error(`Could not parse ${file}: ${err.message}`);
+    }
+    const ignoreRules = Array.isArray(raw?.ignoreRules) ? raw.ignoreRules : [];
+    const known = new Set(rules.map((r) => r.id));
+    const unknown = ignoreRules.filter((r) => !known.has(r));
+    if (unknown.length) {
+      throw new Error(`Unknown rule in ${file}: ${unknown.join(", ")}. See --list-rules.`);
+    }
+    return { ignoreRules, ignorePaths: Array.isArray(raw?.ignorePaths) ? raw.ignorePaths : [] };
   }
   return { ignoreRules: [], ignorePaths: [] };
 }
