@@ -131,6 +131,14 @@ test("oops-error ignores log calls and thrown errors", () => {
   assert.deepStrictEqual(scanSource('const msg = "Oops, something went wrong";\n', "a.ts").map((f) => f.rule), ["oops-error"]);
 });
 
+test("oops-error matches Whoops and ignores look-alikes like loops or hoops", () => {
+  // Issue #129: "Whoops" is the most common variant of "Oops".
+  assert.deepStrictEqual(scanSource('const msg = "Whoops! We could not load your orders.";\n', "a.tsx").map((f) => f.rule), ["oops-error"]);
+  assert.deepStrictEqual(scanSource('const msg = "whoops, try again";\n', "a.ts").map((f) => f.rule), ["oops-error"]);
+  // Words containing the letters but not matching whole-word oops/whoops must not flag.
+  assert.deepStrictEqual(scanSource('const msg = "for loops and basketball hoops";\n', "a.ts"), []);
+});
+
 test("ignore comments from before the rename still work", () => {
   const src = '// unslopovich-ignore oops-error\nconst a = "Oops";\nconst b = "Oops"; // unslopovich-ignore\nconst c = "Oops";\n';
   assert.deepStrictEqual(scanSource(src, "a.ts").map((f) => f.line), [4]);
