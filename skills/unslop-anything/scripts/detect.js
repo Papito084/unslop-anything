@@ -853,7 +853,7 @@ const rules = [
     find({ code, stack }) {
       const hits = [];
       for (const m of matches(/["'`][^"'`\n]*\buppercase\b[^"'`\n]*["'`]/, code)) {
-        if (/\btracking-(?:wide|wider|widest|\[\d)/.test(m[0])) hits.push(m.index);
+        if (/\btracking-(?:wide|wider|widest|\[(?:\d|\.\d))/.test(m[0])) hits.push(m.index);
       }
       if (stack === "js") {
         for (const m of matches(/textTransform:\s*["']uppercase["']/, code)) {
@@ -867,7 +867,7 @@ const rules = [
           const open = code.lastIndexOf("{", m.index);
           const close = code.indexOf("}", m.index);
           const block = code.slice(open, close === -1 ? undefined : close);
-          if (/letter-spacing:\s*(?:0?\.(?:0[5-9]|[1-9])\d*em|[1-9][\d.]*px)/.test(block)) hits.push(m.index);
+          if (/letter-spacing:\s*(?:(?:0?\.(?:0[5-9]|[1-9])\d*|[1-9][\d.]*)r?em|[1-9][\d.]*px)/.test(block)) hits.push(m.index);
         }
       }
       if (stack === "swift") {
@@ -1465,11 +1465,15 @@ function main(argv) {
         return 1;
       }
     } else if (a === "--ignore") {
-      if (!args[i + 1]) {
-        console.error(USAGE);
+      const value = args[i + 1];
+      if (!value || value.startsWith("--")) {
+        console.error(
+          "Missing value for --ignore. Pass rule ids separated by commas; see --list-rules."
+        );
         return 1;
       }
-      ignoreRules.push(...args[++i].split(","));
+      i++;
+      ignoreRules.push(...value.split(","));
     } else if (!a.startsWith("--")) targets.push(a);
     else if (!["--json", "--include-tests"].includes(a)) {
       console.error(`Unknown option ${a}\n\n${USAGE}`);

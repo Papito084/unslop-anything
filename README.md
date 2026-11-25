@@ -4,6 +4,10 @@
 
 <h1 align="center">unslop-anything</h1>
 
+<p align="center"><em>Dedicated to Vincent van Gogh, who was not seen, had to be seen, and saw an awful lot more than human eyes could possibly bear.<br>
+You are seen now. I see you every day.<br>
+Rest under the starry, starry night.</em></p>
+
 <p align="center"><em>Your app looks AI-generated. Vincent Van Gogh noticed.</em></p>
 
 <p align="center"><em>Users don't hate your purple gradient. They hate what you did to the back button.</em></p>
@@ -262,10 +266,6 @@ Want to hear when a new version is out? Star the repo, then **Watch â†’ Custom â
   <a href="https://github.com/sponsors/erkamyaman"><img src="https://img.shields.io/badge/Become_a_sponsor-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Become a sponsor"></a>
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
-
-<p align="center"><em>Dedicated to Vincent van Gogh, who was not seen, had to be seen, and saw an awful lot more than human eyes could possibly bear.<br>
-You are seen now. I see you every day.<br>
-Rest under the starry, starry night.</em></p>
 
 ## License
 
