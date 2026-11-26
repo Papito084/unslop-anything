@@ -658,13 +658,25 @@ function glowLayers(list) {
       start = i + 1;
     }
   }
-  return layers
-    .filter((layer) => {
-      if (!/\binset\b/.test(layer)) return true;
-      const lengths = layer.replace(/[a-z]+\([^)]*\)|#[0-9a-f]+/gi, " ").match(/-?\d*\.?\d+(?:px|rem|em)?\b/g) || [];
-      return lengths.length >= 3 && parseFloat(lengths[2]) > 0;
-    })
-    .join(",");
+  return layers.filter((layer) => {
+    if (!/\binset\b/.test(layer)) return true;
+    const lengths = layer.replace(/[a-z]+\([^)]*\)|#[0-9a-f]+/gi, " ").match(/-?\d*\.?\d+(?:px|rem|em)?\b/g) || [];
+    return lengths.length >= 3 && parseFloat(lengths[2]) > 0;
+  });
+}
+
+function isGlowValue(value, stack) {
+  if (!value) return false;
+  if (/black|gray|grey|shadow|\.primary\b|label|0x[0-9a-f]{2}000000|#000(?:000)?(?:[0-9a-f]{2})?\b|#000[0-9a-f]\b|rgba?\([\s_]*0(?:[\s_]*,[\s_]*|[\s_]+)0(?:[\s_]*,[\s_]*|[\s_]+)0/i.test(value)) return false;
+  const named = /(?:\.|Colors\.|Color\.|\b)(purple|deepPurple|indigo|violet|pink|magenta|fuchsia|blue|cyan|teal|mint|accentColor|accent)\b/i.test(value);
+  const hex = hexColors(value, stack).some(isSaturated);
+  const rgbRe = /rgba?\([\s_]*(\d+)(?:[\s_]*,[\s_]*|[\s_]+)(\d+)(?:[\s_]*,[\s_]*|[\s_]+)(\d+)/g;
+  let rgbSat = false;
+  let rgb;
+  while ((rgb = rgbRe.exec(value))) {
+    if (Math.max(+rgb[1], +rgb[2], +rgb[3]) - Math.min(+rgb[1], +rgb[2], +rgb[3]) > 60) { rgbSat = true; break; }
+  }
+  return named || hex || rgbSat;
 }
 
 const rules = [
@@ -755,18 +767,8 @@ const rules = [
       const hits = [];
       for (const m of matches(/\.shadow\(\s*color:\s*([^,)]+)|shadowColor\s*[:=]\s*["']?([^"',;\n}]+)|(?:ambientColor|spotColor)\s*=\s*([^,)\n]+)|BoxShadow\(\s*color:\s*([^,)\n]+)|box-shadow:\s*([^;\n]+)|\bshadow-((?:purple|violet|indigo|pink|fuchsia|blue|cyan|teal)-\d{2,3})\b|\bshadow-\[([^\]\n]+)\]/, code)) {
         const raw = m.slice(1).find(Boolean) || "";
-        const value = m[5] || m[7] ? glowLayers(raw.replace(/_/g, " ")) : raw;
-        if (!value) continue;
-        if (/black|gray|grey|shadow|\.primary\b|label|0x[0-9a-f]{2}000000|#000(?:000)?(?:[0-9a-f]{2})?\b|#000[0-9a-f]\b|rgba?\([\s_]*0(?:[\s_]*,[\s_]*|[\s_]+)0(?:[\s_]*,[\s_]*|[\s_]+)0/i.test(value)) continue;
-        const named = /(?:\.|Colors\.|Color\.|\b)(purple|deepPurple|indigo|violet|pink|magenta|fuchsia|blue|cyan|teal|mint|accentColor|accent)\b/i.test(value);
-        const hex = hexColors(value, stack).some(isSaturated);
-        const rgbRe = /rgba?\([\s_]*(\d+)(?:[\s_]*,[\s_]*|[\s_]+)(\d+)(?:[\s_]*,[\s_]*|[\s_]+)(\d+)/g;
-        let rgbSat = false;
-        let rgb;
-        while ((rgb = rgbRe.exec(value))) {
-          if (Math.max(+rgb[1], +rgb[2], +rgb[3]) - Math.min(+rgb[1], +rgb[2], +rgb[3]) > 60) { rgbSat = true; break; }
-        }
-        if (named || hex || rgbSat) hits.push(m.index);
+        const layers = m[5] || m[7] ? glowLayers(raw.replace(/_/g, " ")) : raw ? [raw] : [];
+        if (layers.some((value) => isGlowValue(value, stack))) hits.push(m.index);
       }
       return hits;
     },

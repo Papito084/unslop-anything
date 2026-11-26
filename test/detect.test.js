@@ -1684,3 +1684,23 @@ test("slop-gradient reads SwiftUI Color(red:green:blue:) stops (issue #162)", ()
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
+
+test("glow-shadow checks each box-shadow layer independently so a neutral layer does not hide a colored glow", () => {
+  const rulesFor = (src, file = "a.css") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.rule);
+  const flagged = [
+    [".card { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 24px rgba(124, 58, 237, 0.5); }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px #000, 0 0 20px #7c3aed; }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px black, 0 0 20px purple; }\n", "a.css"],
+    [".card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 28px rgb(139 92 246 / 0.5); }\n", "a.css"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_40px_#7c3aed]">x</div>\n', "a.tsx"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_40px_rgba(124,58,237,0.5)]">x</div>\n', "a.tsx"],
+  ];
+  for (const [src, file] of flagged) assert.deepStrictEqual(rulesFor(src, file), ["glow-shadow"], src);
+  const quiet = [
+    [".card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1); }\n", "a.css"],
+    [".card { box-shadow: inset 2px 0 0 #e0763f, 0 1px 2px rgba(0, 0, 0, 0.2); }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px black, 0 4px 12px #00000040; }\n", "a.css"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_8px_rgba(128,128,128,0.3)]">x</div>\n', "a.tsx"],
+  ];
+  for (const [src, file] of quiet) assert.deepStrictEqual(rulesFor(src, file), [], src);
+});
