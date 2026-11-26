@@ -90,6 +90,35 @@ test("safe-area-off flags .ignoresSafeArea(.all) forms, not backgrounds", () => 
   assert.deepStrictEqual(scanSource("VStack { }.ignoresSafeArea(edges: .top)", "a.swift"), []);
 });
 
+test("safe-area-off skips multi-line background receivers without hiding container views", () => {
+  const lines = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "safe-area-off").map((f) => f.line);
+  const quiet = [
+    "ZStack {\n  Color.black\n    .ignoresSafeArea()\n}\n",
+    "Color.black\n  .opacity(0.8)\n  .ignoresSafeArea()\n",
+    "Color.black\n  .edgesIgnoringSafeArea(.all)\n",
+    "LinearGradient(\n  colors: [.black, .clear],\n  startPoint: .top,\n  endPoint: .bottom\n)\n  .ignoresSafeArea()\n",
+    "VStack {\n  Text(\"Hi\")\n}\n.background(LinearGradient(colors: [.white, .gray],\n  startPoint: .center, endPoint: .bottom).ignoresSafeArea())\n",
+    "VStack {\n  Text(\"Hi\")\n}\n.background {\n  backdrop\n    .ignoresSafeArea()\n}\n",
+    "Image(\"hero\")\n  .resizable()\n  .scaledToFill()\n  .ignoresSafeArea()\n",
+    "Rectangle()\n  .fill(.black)\n  .ignoresSafeArea()\n",
+    "SwiftUI.Color.black\n  .ignoresSafeArea()\n",
+    "AsyncImage(url: url)\n  .ignoresSafeArea()\n",
+    "KFImage(url)\n  .resizable()\n  .ignoresSafeArea()\n",
+    "Color.theme.accent\n  .ignoresSafeArea()\n",
+    "Color.brand.primary\n  .opacity(0.5)\n  .ignoresSafeArea()\n",
+    "heroGradient\n  .ignoresSafeArea()\n",
+    "backgroundLayer()\n  .ignoresSafeArea()\n",
+    "backgroundImage?.resizable()\n  .ignoresSafeArea()\n",
+  ];
+  for (const src of quiet) assert.deepStrictEqual(lines(src), [], src);
+  // Real container views still flag, even when they contain a Color or follow a .background modifier.
+  assert.deepStrictEqual(lines("VStack {\n  Color.red\n  Text(\"Content\")\n}\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("VStack {\n  Text(\"Content\")\n}\n.background(Color.white)\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("VStack {\n  Text(\"Content\")\n}\n.background { Color.white }\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("Text(\"Hi\").foregroundStyle(Color.red).ignoresSafeArea()\n"), [1]);
+  assert.deepStrictEqual(lines("ZStack {\n  Color.black\n    .ignoresSafeArea()\n  VStack {\n    Text(\"Hi\")\n  }\n  .ignoresSafeArea()\n}\n"), [7]);
+});
+
 test("fixed-text-size skips Swift files that build for macOS only", () => {
   const rulesOf = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "fixed-text-size").map((f) => f.line);
   const text = 'Text("Hi").font(.system(size: 13))\n';

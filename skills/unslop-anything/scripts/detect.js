@@ -645,6 +645,136 @@ function macOnlySwift(code) {
   return appKit;
 }
 
+function matchOpenBackward(code, closeIdx, openCh, closeCh) {
+  let depth = 0;
+  for (let i = closeIdx; i >= 0; i--) {
+    const c = code[i];
+    if (c === '"') {
+      i--;
+      while (i >= 0) {
+        if (code[i] === '"') {
+          let slashes = 0;
+          while (i - 1 - slashes >= 0 && code[i - 1 - slashes] === "\\") slashes++;
+          if (slashes % 2 === 0) break;
+        }
+        i--;
+      }
+      continue;
+    }
+    if (c === closeCh) depth++;
+    else if (c === openCh && --depth === 0) return i;
+  }
+  return -1;
+}
+
+// True when the `.ignoresSafeArea` / `.edgesIgnoringSafeArea` at `index` sits
+// on a background/decorative view (even across a multi-line call or modifier
+// chain) or directly inside a `.background(...)` / `.background { ... }`.
+function isBackgroundSafeArea(code, index) {
+  const BG_CONSTRUCTOR = /^(?:Color|\w*Image|Rectangle|Divider|\w*Gradient)$/;
+  // 1) Directly inside a still-open `.background(` or `.background {`.
+  const limit = Math.max(0, index - 4000);
+  let pDepth = 0;
+  let bDepth = 0;
+  for (let i = index - 1; i >= limit; i--) {
+    const c = code[i];
+    if (c === '"') {
+      i--;
+      while (i >= limit) {
+        if (code[i] === '"') {
+          let slashes = 0;
+          while (i - 1 - slashes >= 0 && code[i - 1 - slashes] === "\\") slashes++;
+          if (slashes % 2 === 0) break;
+        }
+        i--;
+      }
+      continue;
+    }
+    if (c === ")") pDepth++;
+    else if (c === "(") {
+      if (pDepth > 0) pDepth--;
+      else {
+        if (/\.background\s*$/.test(code.slice(Math.max(0, i - 32), i))) return true;
+        break;
+      }
+    } else if (c === "}") bDepth++;
+    else if (c === "{") {
+      if (bDepth > 0) bDepth--;
+      else {
+        let head = i - 1;
+        while (head >= 0 && /\s/.test(code[head])) head--;
+        if (head >= 0 && code[head] === ")") {
+          const open = matchOpenBackward(code, head, "(", ")");
+          if (open !== -1) head = open - 1;
+        }
+        if (/\.background\s*$/.test(code.slice(Math.max(0, head - 31), head + 1))) return true;
+        break;
+      }
+    }
+  }
+  // 2) Walk backwards through the receiver's modifier chain to its root view.
+  let i = index - 1;
+  while (i >= 0) {
+    while (i >= 0 && /[\s?!]/.test(code[i])) i--;
+    if (i < 0) return false;
+    if (code[i] === ")") {
+      const open = matchOpenBackward(code, i, "(", ")");
+      if (open === -1) return false;
+      let end = open - 1;
+      while (end >= 0 && /\s/.test(code[end])) end--;
+      let start = end;
+      while (start >= 0 && /\w/.test(code[start])) start--;
+      const name = code.slice(start + 1, end + 1);
+      if (BG_CONSTRUCTOR.test(name)) return true;
+      let dot = start;
+      while (dot >= 0 && /\s/.test(code[dot])) dot--;
+      if (dot >= 0 && code[dot] === ".") {
+        i = dot - 1;
+        continue;
+      }
+      return /background|Gradient/.test(name);
+    }
+    if (code[i] === "}") {
+      const open = matchOpenBackward(code, i, "{", "}");
+      if (open === -1) return false;
+      let head = open - 1;
+      while (head >= 0 && /\s/.test(code[head])) head--;
+      if (head >= 0 && code[head] === ")") {
+        const pOpen = matchOpenBackward(code, head, "(", ")");
+        if (pOpen === -1) return false;
+        head = pOpen - 1;
+        while (head >= 0 && /\s/.test(code[head])) head--;
+      }
+      let start = head;
+      while (start >= 0 && /\w/.test(code[start])) start--;
+      let dot = start;
+      while (dot >= 0 && /\s/.test(code[dot])) dot--;
+      if (dot >= 0 && code[dot] === ".") {
+        i = dot - 1;
+        continue;
+      }
+      return false;
+    }
+    if (/\w/.test(code[i])) {
+      let cur = i;
+      while (cur >= 0 && /\w/.test(code[cur])) {
+        let start = cur;
+        while (start >= 0 && /\w/.test(code[start])) start--;
+        const name = code.slice(start + 1, cur + 1);
+        if (BG_CONSTRUCTOR.test(name) || /background|Gradient/.test(name)) return true;
+        let dot = start;
+        while (dot >= 0 && /\s/.test(code[dot])) dot--;
+        if (dot < 0 || code[dot] !== ".") break;
+        cur = dot - 1;
+        while (cur >= 0 && /[\s?!]/.test(code[cur])) cur--;
+      }
+      return false;
+    }
+    return false;
+  }
+  return false;
+}
+
 function glowLayers(list) {
   const layers = [];
   let depth = 0;
@@ -1050,8 +1180,7 @@ const rules = [
     find({ code }) {
       const hits = [];
       for (const m of matches(/\.ignoresSafeArea\(\s*(?:\.(?:all|container)\s*)?(?:,?\s*edges:\s*\.all\s*)?\)|\.edgesIgnoringSafeArea\(\s*\.all\s*\)/, code)) {
-        const lineStart = code.lastIndexOf("\n", m.index) + 1;
-        if (/background|Color\(|Color\.|Image\(|Gradient|Rectangle\(\)|Divider\(\)/.test(code.slice(lineStart, m.index))) continue;
+        if (isBackgroundSafeArea(code, m.index)) continue;
         hits.push(m.index);
       }
       return hits;
