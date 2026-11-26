@@ -543,6 +543,18 @@ test("transition-all stops at the quote that ends a CSS-in-JS value", () => {
   assert.deepStrictEqual(scanSource(singleQuoted, "a.tsx").map((f) => f.rule), ["transition-all"]);
 });
 
+test("transition-all flags transitionProperty: 'all' in JS style objects (issue #205)", () => {
+  const rulesFor = (src, file = "card.ts") => scanSource(src, file).map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor('export const card = {\n  transitionProperty: "all",\n  transitionDuration: "200ms",\n};\n'), ["transition-all"]);
+  assert.deepStrictEqual(rulesFor("const s = { transitionProperty: 'all' };\n", "a.tsx"), ["transition-all"]);
+  assert.deepStrictEqual(rulesFor("const s = { transitionProperty: `all` };\n", "a.tsx"), ["transition-all"]);
+  assert.deepStrictEqual(rulesFor('const s = { transitionProperty: "color, all" };\n', "a.tsx"), ["transition-all"]);
+  // Quiet cases
+  assert.deepStrictEqual(rulesFor('const s = { transitionProperty: "opacity, transform" };\n', "a.tsx"), []);
+  assert.deepStrictEqual(rulesFor('const s = { transitionProperty: "allowed" };\n', "a.tsx"), []);
+  assert.deepStrictEqual(rulesFor('const s = { transitionProperty: "opacity", pointerEvents: "all" };\n', "a.tsx"), []);
+});
+
 test("transition-all flags a shorthand that names no property, since it defaults to all", () => {
   const rulesFor = (src, file = "a.css") => scanSource(src, file).map((f) => f.rule);
   assert.deepStrictEqual(rulesFor(".card {\n  transition: 0.3s ease;\n}\n"), ["transition-all"]);
