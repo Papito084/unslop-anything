@@ -1543,6 +1543,23 @@ test("sparkle-icon scans nested Swift interpolation and raw strings", () => {
   assert.deepStrictEqual(scanSource(prose, "a.swift"), []);
 });
 
+test("sparkle-icon flags Iconify and Nuxt sparkle icon names, not prose or unrelated icons", () => {
+  const vue = [
+    "<template>",
+    '  <Icon icon="lucide:sparkles" />',
+    '  <UIcon name="i-lucide-sparkles" />',
+    '  <Icon icon="mdi:sparkle" />',
+    '  <Icon icon="heroicons:sparkles" />',
+    '  <Icon icon="ph:sparkle" />',
+    '  <Icon icon="tabler:sparkles" />',
+    '  <p>Add some sparkles</p>',
+    '  <Icon icon="lucide:star" />',
+    "</template>",
+  ].join("\n");
+  const findings = scanSource(vue, "Badge.vue").filter((f) => f.rule === "sparkle-icon");
+  assert.deepStrictEqual(findings.map((f) => f.line), [2, 3, 4, 5, 6, 7]);
+});
+
 test("blankComments keeps slashes inside Swift raw strings and still finds later symbols", () => {
   const src = [
     'let label = #"A "// B"#',
