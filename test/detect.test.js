@@ -1532,6 +1532,31 @@ test("glow-shadow catches Android shadowColor on one line or with alpha", () => 
   assert.deepStrictEqual(scanSource(neutral, "a.xml"), []);
 });
 
+test("glow-shadow catches React Native textShadowColor (issue #201)", () => {
+  const rulesFor = (src) => scanSource(src, "Title.tsx").map((f) => f.rule);
+  const repro = [
+    'import { StyleSheet } from "react-native";',
+    "",
+    "const styles = StyleSheet.create({",
+    '  title: { textShadowColor: "#7C3AED", textShadowRadius: 12 },',
+    "});",
+    "",
+  ].join("\n");
+  const findings = scanSource(repro, "Title.tsx");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "glow-shadow", line: 4 },
+  ]);
+
+  // Neutral colors stay quiet
+  assert.deepStrictEqual(rulesFor('const s = { textShadowColor: "rgba(0, 0, 0, 0.3)" };\n'), []);
+  assert.deepStrictEqual(rulesFor('const s = { textShadowColor: "#000" };\n'), []);
+  assert.deepStrictEqual(rulesFor('const s = { textShadowColor: "#000000" };\n'), []);
+
+  // Existing shadowColor cases still work
+  assert.deepStrictEqual(rulesFor('const s = { shadowColor: "#7C3AED" };\n'), ["glow-shadow"]);
+  assert.deepStrictEqual(rulesFor('const s = { shadowColor: "#000" };\n'), []);
+});
+
 test("sparkle-icon flags the singular and combined icon names", () => {
   const rulesFor = (src) => scanSource(src, "a.tsx").map((f) => f.rule);
   // Issue #45: these gave no finding before the fix.
