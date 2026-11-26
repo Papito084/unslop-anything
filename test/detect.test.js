@@ -1684,3 +1684,28 @@ test("slop-gradient reads SwiftUI Color(red:green:blue:) stops (issue #162)", ()
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
+
+test("slop-gradient reads Compose Color(red = ..., green = ..., blue = ...) stops (issue #174)", () => {
+  const rulesFor = (src) => scanSource(src, "Hero.kt").map((f) => f.rule).filter((r) => r === "slop-gradient");
+  const gradient = (stops) => `Box(Modifier.background(Brush.linearGradient(listOf(${stops}))))\n`;
+  const flagged = [
+    "Color(red = 124, green = 58, blue = 237), Color(red = 219, green = 39, blue = 119)",
+    "Color(red = 0.49f, green = 0.23f, blue = 0.93f), Color(red = 0.86f, green = 0.15f, blue = 0.47f)",
+    "Color(red = 124, green = 58, blue = 237, alpha = 255), Color.White",
+    "Color(red = 0.49f, green = 0.23f, blue = 0.93f, alpha = 0.8f), Color.White",
+    // Trailing comma
+    "Color(red = 124, green = 58, blue = 237,), Color.White",
+    // Multiline
+    "Color(\n      red = 124,\n      green = 58,\n      blue = 237\n    ), Color.White",
+  ];
+  for (const stops of flagged) assert.deepStrictEqual(rulesFor(gradient(stops)), ["slop-gradient"], stops);
+
+  const quiet = [
+    "Color(red = 14, green = 165, blue = 233), Color(red = 34, green = 197, blue = 94)",
+    "Color(red = 0.05f, green = 0.65f, blue = 0.91f), Color(red = 0.13f, green = 0.77f, blue = 0.37f)",
+    "Color(red = 0, green = 0, blue = 0), Color(red = 255, green = 255, blue = 255)",
+    // A component that is a variable cannot be read.
+    "Color(red = r, green = g, blue = b), Color(red = redVar, green = 58, blue = 237)",
+  ];
+  for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});

@@ -171,6 +171,31 @@ function swiftRgbColors(snippet) {
   return out;
 }
 
+// Jetpack Compose's Color(red = ..., green = ..., blue = ...) in a snippet,
+// as uppercase hex, so it goes through the same checks as Color(0xFF7C3AED).
+// Components may be ints (0 to 255) or floats (0 to 1, typically ending in f).
+// A trailing alpha is skipped; a component that is not a number skips the color.
+function composeColors(snippet) {
+  const out = [];
+  const number = "(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:[eE][+-]?\\d+)?[fF]?";
+  const re = new RegExp(`\\bColor\\(\\s*red\\s*=\\s*(${number})\\s*,\\s*green\\s*=\\s*(${number})\\s*,\\s*blue\\s*=\\s*(${number})\\s*[,)]`, "g");
+  let m;
+  while ((m = re.exec(snippet))) {
+    const raw = [m[1], m[2], m[3]];
+    const isFloat = raw.some((c) => /[.fF]/.test(c));
+    const hex = raw.map((c) => {
+      const num = parseFloat(c);
+      if (Number.isNaN(num)) return null;
+      if (isFloat) {
+        return Math.round(Math.min(1, Math.max(0, num)) * 255).toString(16).padStart(2, "0");
+      }
+      return Math.round(Math.min(255, Math.max(0, num))).toString(16).padStart(2, "0");
+    });
+    if (hex.every(Boolean)) out.push(hex.join("").toUpperCase());
+  }
+  return out;
+}
+
 // The purple, indigo, violet and hot-pink band that default AI palettes live in.
 function isSlopHue(hex) {
   const { h, s, l } = hexToHsl(hex);
@@ -683,7 +708,7 @@ const rules = [
         if (/^\s*(?:import|export\s+\{|from)\b/.test(code.slice(lineStart, m.index))) continue;
         // Only the gradient's own stops count, not whatever follows it.
         const stops = gradientScope(code, m.index, m[0]);
-        if ([...hexColors(stops, stack), ...cssFunctionColors(stops), ...flutterColors(stops), ...swiftRgbColors(stops)].some(isSlopHue) || SLOP_COLOR_NAME.test(stops)) hits.push(m.index);
+        if ([...hexColors(stops, stack), ...cssFunctionColors(stops), ...flutterColors(stops), ...swiftRgbColors(stops), ...composeColors(stops)].some(isSlopHue) || SLOP_COLOR_NAME.test(stops)) hits.push(m.index);
       }
       // Tailwind: bg-gradient-to-r from-violet-600 to-fuchsia-500
       for (const m of matches(/["'`][^"'`\n]*\bbg-(?:gradient|linear|radial|conic)-[^"'`\n]*["'`]/, code)) {
