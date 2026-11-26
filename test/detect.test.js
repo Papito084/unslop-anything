@@ -1660,6 +1660,26 @@ test("slop-gradient reads Flutter Color.fromARGB and Color.fromRGBO stops (issue
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
 
+test("slop-gradient reads Flutter accent colors like Colors.purpleAccent (issue #172)", () => {
+  const rulesFor = (src) => scanSource(src, "hero.dart").map((f) => f.rule).filter((r) => r === "slop-gradient");
+  const gradient = (stops) => `Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [${stops}])))\n`;
+  const flagged = [
+    "Colors.purpleAccent, Colors.pinkAccent",
+    "Colors.deepPurpleAccent, Colors.pinkAccent",
+    "Colors.indigoAccent, Colors.white",
+    "Colors.purpleAccent.shade200, Colors.pinkAccent.shade400",
+    "Colors.deepPurpleAccent.shade100, Colors.white",
+  ];
+  for (const stops of flagged) assert.deepStrictEqual(rulesFor(gradient(stops)), ["slop-gradient"], stops);
+
+  const quiet = [
+    "Colors.tealAccent, Colors.lightBlueAccent",
+    "Colors.greenAccent, Colors.cyanAccent",
+    "Colors.orangeAccent, Colors.yellowAccent",
+  ];
+  for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});
+
 test("slop-gradient reads SwiftUI Color(red:green:blue:) stops (issue #162)", () => {
   const rulesFor = (src) => scanSource(src, "Hero.swift").map((f) => f.rule).filter((r) => r === "slop-gradient");
   const gradient = (stops) => `LinearGradient(colors: [${stops}], startPoint: .leading, endPoint: .trailing)\n`;
