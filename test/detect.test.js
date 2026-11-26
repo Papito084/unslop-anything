@@ -1550,6 +1550,34 @@ test("sparkle-icon flags the singular and combined icon names", () => {
   assert.deepStrictEqual(rulesFor("<SparkleCounter />\n"), []);
 });
 
+test("sparkle-icon flags Font Awesome's wand-magic-sparkles (issue #198)", () => {
+  const rulesFor = (src, file = "a.tsx") => scanSource(src, file).map((f) => f.rule);
+  // Repro: Magic.tsx
+  const repro = [
+    'import { faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";',
+    "",
+    "export function Magic() {",
+    '  return <i className="fa-solid fa-wand-magic-sparkles" />;',
+    "}",
+    "",
+  ].join("\n");
+  const findings = scanSource(repro, "Magic.tsx");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "sparkle-icon", line: 1 },
+    { rule: "sparkle-icon", line: 4 },
+  ]);
+
+  // Standalone class and HTML class attribute
+  assert.deepStrictEqual(rulesFor('<i class="fa-wand-magic-sparkles"></i>\n', "a.html"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor('<FontAwesomeIcon icon="wand-magic-sparkles" />\n'), ["sparkle-icon"]);
+
+  // Quiet cases: plain wand without sparkles
+  assert.deepStrictEqual(rulesFor('import { faWandMagic } from "@fortawesome/free-solid-svg-icons";\n'), []);
+  assert.deepStrictEqual(rulesFor('<i className="fa-solid fa-wand-magic" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<i class="fa-wand-magic"></i>\n', "a.html"), []);
+  assert.deepStrictEqual(rulesFor('<FontAwesomeIcon icon="wand-magic" />\n'), []);
+});
+
 test("sparkle-icon flags sparkle-derived SF Symbols but not words containing sparkles", () => {
   const src = [
     "import SwiftUI",
