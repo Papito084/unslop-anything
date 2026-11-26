@@ -1121,6 +1121,35 @@ test("img-no-alt flags Next.js <Image> without alt, and ignores <ImageGallery>",
   assert.deepStrictEqual(rulesFor("<Image source={logo} accessibilityLabel=\"Logo\" />\n"), []);
 });
 
+test("img-no-alt flags Nuxt Image's NuxtImg and NuxtPicture (issue #203)", () => {
+  const rulesFor = (src, file = "Hero.vue") => scanSource(src, file).map((f) => f.rule);
+  const repro = [
+    "<template>",
+    '  <NuxtImg src="/hero.png" />',
+    '  <NuxtPicture src="/team.png" />',
+    "</template>",
+    "",
+  ].join("\n");
+  const findings = scanSource(repro, "Hero.vue");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "img-no-alt", line: 2 },
+    { rule: "img-no-alt", line: 3 },
+  ]);
+  // Also flags kebab-case forms
+  assert.deepStrictEqual(rulesFor('<nuxt-img src="/hero.png" />\n'), ["img-no-alt"]);
+  assert.deepStrictEqual(rulesFor('<nuxt-picture src="/team.png" />\n'), ["img-no-alt"]);
+
+  // Quiet cases: alt, empty alt, and bound :alt
+  assert.deepStrictEqual(rulesFor('<NuxtImg src="/hero.png" alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<NuxtImg src="/hero.png" alt="" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<NuxtImg src="/hero.png" :alt="photo.caption" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<NuxtPicture src="/team.png" alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<NuxtPicture src="/team.png" alt="" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<NuxtPicture src="/team.png" :alt="photo.caption" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<nuxt-img src="/hero.png" alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(rulesFor('<nuxt-picture src="/team.png" :alt="photo.caption" />\n'), []);
+});
+
 test("clickable-div flags a href-less anchor with onClick", () => {
   const findingsFor = (src) => scanSource(src, "a.tsx");
   const src = [
