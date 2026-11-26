@@ -1426,8 +1426,8 @@ const rules = [
         if (/\b(?:focus|focus-visible|focus-within|group-focus-visible|peer-focus-visible):|data-\[(?:highlighted|selected|focus|focused)|aria-selected:|data-\[state=/.test(withoutMatch)) continue;
         hits.push(m.index);
       }
-      if ((stack === "css" || stack === "web") && !/focus-visible/.test(code)) {
-        for (const m of matches(/outline:\s*(?:none|0)\b/, code)) hits.push(m.index);
+      if (!/focus-visible/.test(code)) {
+        for (const m of matches(/outline:\s*(?:["']?none["']?|0\b)/, code)) hits.push(m.index);
       }
       return hits;
     },
