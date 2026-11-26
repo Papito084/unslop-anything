@@ -1868,6 +1868,32 @@ test("glow-shadow checks each box-shadow layer independently so a neutral layer 
   for (const [src, file] of quiet) assert.deepStrictEqual(rulesFor(src, file), [], src);
 });
 
+test("glow-shadow catches CSS filter: drop-shadow() glows (issue #199)", () => {
+  const rulesFor = (src, file = "logo.css") => scanSource(src, file).map((f) => f.rule);
+  // Repro: single drop-shadow with hex color
+  const repro = ".logo {\n  filter: drop-shadow(0 0 20px #7c3aed);\n}\n";
+  const findings = scanSource(repro, "logo.css");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "glow-shadow", line: 2 },
+  ]);
+
+  // Combined with other filter functions and rgb() color
+  assert.deepStrictEqual(
+    rulesFor(".logo { filter: brightness(1.1) drop-shadow(0 0 12px rgb(124 58 237 / 0.6)); }\n"),
+    ["glow-shadow"]
+  );
+
+  // Neutral drop-shadow stays quiet
+  assert.deepStrictEqual(
+    rulesFor(".logo { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)); }\n"),
+    []
+  );
+  assert.deepStrictEqual(
+    rulesFor(".logo { filter: drop-shadow(0 2px 4px #000); }\n"),
+    []
+  );
+});
+
 test("slop-gradient reads UIKit system colors like .systemPurple and .systemPink", () => {
   const rulesFor = (src) => scanSource(src, "Hero.swift").map((f) => f.rule).filter((r) => r === "slop-gradient");
   const gradient = (stops) => `LinearGradient(colors: [${stops}], startPoint: .leading, endPoint: .trailing)\n`;
