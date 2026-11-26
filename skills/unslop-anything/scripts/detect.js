@@ -989,8 +989,8 @@ const rules = [
     find({ code, stack }) {
       const hits = [];
       if (stack === "js" || stack === "web") {
-        // Vuetify's v-card and Angular Material's mat-card nest like ion-card (#202).
-        for (const m of matches(/<(Card|ion-card|v-card|mat-card)(?=[\s/>])/, code)) {
+        // Vuetify's v-card, Angular Material's mat-card, Quasar's q-card and Element Plus's el-card nest like ion-card (#202, #228).
+        for (const m of matches(/<(Card|ion-card|v-card|mat-card|q-card|el-card)(?=[\s/>])/, code)) {
           const end = tagEnd(code, m.index + m[0].length);
           if (end === -1) continue;
           if (/\/\s*$/.test(code.slice(m.index + m[0].length, end))) continue;
