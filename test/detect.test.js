@@ -486,6 +486,21 @@ test("vague-button catches Swift, Compose and Flutter buttons", () => {
   assert.deepStrictEqual(scanSource('Text("Save address")', "a.kt"), []);
 });
 
+test("vague-button catches SwiftUI trailing-closure Button { ... } label: { ... }", () => {
+  const lines = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "vague-button").map((f) => f.line);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  Text("Submit")\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  HStack { Image(systemName: "arrow.right"); Text("Click here") }\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  Label("Tap here", systemImage: "hand.tap")\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button(role: .destructive) {\n  deleteAll()\n} label: {\n  Text("Submit")\n}\n'), [1]);
+  // Specific labels stay quiet even when the action closure mentions a vague word.
+  assert.deepStrictEqual(lines('Button {\n  analytics.track("Submit")\n  let unused = Text("Submit")\n} label: {\n  Text("Save address")\n}\n'), []);
+  assert.deepStrictEqual(lines('Button(role: .destructive) {\n  log("Submit")\n} label: {\n  Text("Delete account")\n}\n'), []);
+  // A type named Button without a trailing label closure is not a SwiftUI button call,
+  // and a lowercase helper like label("Submit") is not SwiftUI's Label view.
+  assert.deepStrictEqual(lines('struct Button {\n  let title = Text("Submit")\n}\n'), []);
+  assert.deepStrictEqual(lines('Button("Save") { label("Submit") }\n'), []);
+});
+
 test("vague-button reads the value of a submit or button input (issue #145)", () => {
   const lines = (src, file = "form.html") => scanSource(src, file).filter((f) => f.rule === "vague-button").map((f) => f.line);
   assert.deepStrictEqual(lines('<form>\n  <input type="submit" value="Submit">\n</form>\n'), [2]);

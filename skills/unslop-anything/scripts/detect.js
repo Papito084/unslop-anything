@@ -1572,17 +1572,42 @@ const rules = [
       }
       // Native buttons: the label only counts inside a button call, so a
       // bare Text("Submit") used as a heading or field label stays quiet.
-      // Button("Submit") { save() } (Swift), Button(onClick = {}) {
-      // Text("Submit") } (Compose trailing lambda), ElevatedButton(...,
+      // Button("Submit") { save() } or Button { save() } label: { Text("Submit") } (Swift),
+      // Button(onClick = {}) { Text("Submit") } (Compose trailing lambda), ElevatedButton(...,
       // child: Text("Submit")) (Flutter). Only the first argument or a
-      // Text(...) label counts, so a vague string in the action code does not.
-      const label = /^\(\s*["'](?:Submit|Click here|Tap here)["']|\bText\(\s*["'](?:Submit|Click here|Tap here)["']/i;
+      // Text(...)/Label(...) label counts, so a vague string in the action code does not.
+      const isVagueText = (s) => /^(?:submit|click here|tap here)$/i.test(s);
+      const hasVagueLabel = (slice) => {
+        const first = /^\(\s*["']([^"']+)["']/.exec(slice);
+        if (first && isVagueText(first[1])) return true;
+        for (const t of matches(/\b(?:Text|Label)\(\s*["']([^"']+)["']/, slice)) {
+          if (isVagueText(t[1])) return true;
+        }
+        return false;
+      };
       for (const m of matches(/\b(?:ElevatedButton|TextButton|OutlinedButton|FilledButton|Button)\s*\(/, code)) {
         const open = m.index + m[0].length - 1;
         let end = closeOf(code, open);
         const lambda = /^\s*\{/.exec(code.slice(end));
         if (lambda) end = closeOf(code, end + lambda[0].length - 1);
-        if (label.test(code.slice(open, end))) hits.push(m.index);
+        const trailingLabel = /^\s*label\s*:\s*\{/.exec(code.slice(end));
+        if (trailingLabel) {
+          const labelOpen = end + trailingLabel[0].length - 1;
+          const labelEnd = closeOf(code, labelOpen);
+          if (hasVagueLabel(code.slice(labelOpen, labelEnd))) hits.push(m.index);
+        } else if (hasVagueLabel(code.slice(open, end))) {
+          hits.push(m.index);
+        }
+      }
+      // SwiftUI multiple-trailing-closure form: Button { save() } label: { Text("Submit") }.
+      for (const m of matches(/\bButton\s*\{/, code)) {
+        const actionOpen = m.index + m[0].length - 1;
+        const actionEnd = closeOf(code, actionOpen);
+        const trailingLabel = /^\s*label\s*:\s*\{/.exec(code.slice(actionEnd));
+        if (!trailingLabel) continue;
+        const labelOpen = actionEnd + trailingLabel[0].length - 1;
+        const labelEnd = closeOf(code, labelOpen);
+        if (hasVagueLabel(code.slice(labelOpen, labelEnd))) hits.push(m.index);
       }
       return hits;
     },
