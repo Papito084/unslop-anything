@@ -1013,7 +1013,7 @@ const rules = [
       // when the literal is exactly that symbol; substrings and apostrophes
       // inside longer text stay quiet.
       const symbol = /^(?:sparkles?(?:\.[a-z0-9._-]+)?|wand\.and\.(?:stars|sparkles)(?:\.[a-z0-9._-]+)?|[a-z0-9-]+:sparkles?|i-[a-z0-9-]+-sparkles?)$/;
-      const re = /\bauto_awesome\b|\bAutoAwesome\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨/;
+      const re = /\bauto_awesome\b|\bAutoAwesome\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bIconSparkles\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨/;
       const hits = [...matches(re, code)].map((m) => m.index);
 
       for (const literal of stringLiterals(code, stack)) {

@@ -1494,6 +1494,10 @@ test("sparkle-icon flags the singular and combined icon names", () => {
   assert.deepStrictEqual(rulesFor("<WandSparklesIcon />\n"), ["sparkle-icon"]);
   // Still flagged, as before.
   assert.deepStrictEqual(rulesFor("<Sparkles />\n"), ["sparkle-icon"]);
+  // Tabler IconSparkles
+  assert.deepStrictEqual(rulesFor("<IconSparkles />\n"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor('import { IconSparkles } from "@tabler/icons-react";\n'), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor("<IconStar />\n"), []);
   // A word that only contains the letters is a different component, not a
   // sparkle icon: word boundaries keep SparkleCounter unflagged.
   assert.deepStrictEqual(rulesFor("<SparkleCounter />\n"), []);
