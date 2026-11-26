@@ -1521,6 +1521,41 @@ test("hover-scale flags CSS transform translateY lift, but not zero or downward 
   assert.deepStrictEqual(rulesFor(".button:hover { transform: translateY(1px); }\n"), []);
 });
 
+test("hover-scale flags Framer Motion whileHover scale and lift (issue #196)", () => {
+  const rulesFor = (src, file = "Card.tsx") => scanSource(src, file).map((f) => f.rule);
+  // Repro: Card.tsx
+  const repro = [
+    'import { motion } from "framer-motion";',
+    "",
+    "export function Card() {",
+    '  return <motion.div whileHover={{ scale: 1.05 }}>Pro plan</motion.div>;',
+    "}",
+    "",
+    "export function Tile() {",
+    '  return <motion.div whileHover={{ y: -4 }}>Starter plan</motion.div>;',
+    "}",
+    "",
+  ].join("\n");
+  const findings = scanSource(repro, "Card.tsx");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "hover-scale", line: 4 },
+    { rule: "hover-scale", line: 8 },
+  ]);
+
+  // scale 1.02 and above, and with other keys
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ scale: 1.02 }}>x</motion.div>\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ scale: 1.05, opacity: 1 }}>x</motion.div>\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ opacity: 1, scale: 1.05 }}>x</motion.div>\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ opacity: 1, y: -4 }}>x</motion.div>\n'), ["hover-scale"]);
+
+  // Quiet cases: shrinking, non-motion props, other properties
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ scale: 0.98 }}>x</motion.div>\n'), []);
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ opacity: 0.8 }}>x</motion.div>\n'), []);
+  assert.deepStrictEqual(rulesFor('<motion.div whileTap={{ scale: 1.05 }}>x</motion.div>\n'), []);
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ scale: 1.01 }}>x</motion.div>\n'), []);
+  assert.deepStrictEqual(rulesFor('<motion.div whileHover={{ y: 4 }}>x</motion.div>\n'), []);
+});
+
 test("glow-shadow catches Android shadowColor on one line or with alpha", () => {
   const oneLine = '<TextView android:shadowColor="#7C3AED" android:shadowRadius="20" />';
   const multiLine = '<TextView\n    android:shadowColor="#807C3AED"\n    android:shadowRadius="20" />';
