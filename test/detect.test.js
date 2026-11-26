@@ -1882,6 +1882,32 @@ test("drawer-nav catches Heroicons Bars3Icon and Tabler IconMenu2, not dropdown 
   assert.deepStrictEqual(lines("<EllipsisVerticalIcon size={24} />\n"), []);
 });
 
+test("drawer-nav catches React Native Paper's icon=\"menu\" (issue #226)", () => {
+  const lines = (src, file = "Header.tsx") => scanSource(src, file, { platform: "mobile" }).filter((f) => f.rule === "drawer-nav").map((f) => [f.line, f.severity]);
+  // Issue #226 repro:
+  const repro = [
+    'import { Appbar } from "react-native-paper";',
+    "",
+    "export function Header() {",
+    "  return (",
+    "    <Appbar.Header>",
+    '      <Appbar.Action icon="menu" onPress={openDrawer} />',
+    "    </Appbar.Header>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [[6, "noticeable"]]);
+
+  assert.deepStrictEqual(lines('<IconButton icon="menu" />\n'), [[1, "noticeable"]]);
+  assert.deepStrictEqual(lines("<IconButton icon='menu' />\n"), [[1, "noticeable"]]);
+  assert.deepStrictEqual(lines('<Icon name="menu" />\n'), [[1, "noticeable"]]);
+  assert.deepStrictEqual(lines("<Icon name='menu' />\n"), [[1, "noticeable"]]);
+
+  // Other Paper icons stay quiet
+  assert.deepStrictEqual(lines('<IconButton icon="menu-down" />\n'), []);
+  assert.deepStrictEqual(lines('<Appbar.Action icon="dots-vertical" />\n'), []);
+});
+
 test("clickable-div flags Angular (click) and Alpine x-on:click handlers", () => {
   const rulesFor = (src) => scanSource(src, "a.html").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<div class="card" (click)="open()">Details</div>\n'), ["clickable-div"]);
