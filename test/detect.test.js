@@ -1156,6 +1156,18 @@ test("nested-cards ignores dotted subcomponents and ion-card parts, still flags 
   assert.deepStrictEqual(rulesFor("<ion-card><ion-card></ion-card></ion-card>", "a.html"), ["nested-cards"]);
 });
 
+test("nested-cards reads opening tags with tagEnd so arrows or > in props do not misread sibling cards", () => {
+  const rulesFor = (src, file = "a.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()} />\n<Card><p>Second</p></Card>\n"), []);
+  assert.deepStrictEqual(rulesFor('<Card title="a > b" />\n<Card><p>Second</p></Card>\n'), []);
+  assert.deepStrictEqual(rulesFor("<Card disabled={count > 0} />\n<Card><p>Second</p></Card>\n"), []);
+  // Real nested cards with arrows or nested JSX in props still flag.
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()}>\n  <Card><p>Inner</p></Card>\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()}>\n  <Card />\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor("<Card header={<span />}>\n  <Card><p>Inner</p></Card>\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor('<ion-card title="a > b"><ion-card></ion-card></ion-card>\n', "a.html"), ["nested-cards"]);
+});
+
 test("img-no-alt accepts Angular [alt] bindings and Svelte {alt} shorthand", () => {
   const rulesFor = (src, file) => scanSource(src, file).map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<img [src]="u.avatar" [alt]="u.name">\n', "a.component.html"), []);

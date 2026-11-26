@@ -959,12 +959,14 @@ const rules = [
     find({ code, stack }) {
       const hits = [];
       if (stack === "js" || stack === "web") {
-        for (const m of matches(/<(Card|ion-card)(?=[\s/>])[^>]*?(\/?)>/, code)) {
-          if (m[2] === "/") continue;
+        for (const m of matches(/<(Card|ion-card)(?=[\s/>])/, code)) {
+          const end = tagEnd(code, m.index + m[0].length);
+          if (end === -1) continue;
+          if (/\/\s*$/.test(code.slice(m.index + m[0].length, end))) continue;
           const tag = m[1];
-          const close = code.indexOf(`</${tag}>`, m.index);
+          const close = code.indexOf(`</${tag}>`, end + 1);
           if (close === -1) continue;
-          const inner = code.slice(m.index + m[0].length, close);
+          const inner = code.slice(end + 1, close);
           if (new RegExp(`<${tag}(?=[\\s/>])`).test(inner)) hits.push(m.index);
         }
       } else {
