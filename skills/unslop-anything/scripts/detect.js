@@ -90,17 +90,18 @@ function hexColors(snippet, stack) {
 function cssFunctionColors(snippet) {
   const out = [];
   const num = "([+-]?(?:\\d+\\.?\\d*|\\.\\d+))";
-  const re = new RegExp(`\\b(rgba?|hsla?)\\(\\s*${num}(%|deg)?\\s*[,\\s_]\\s*${num}(%)?\\s*[,\\s_]\\s*${num}(%)?`, "gi");
+  const re = new RegExp(`\\b(rgba?|hsla?)\\(\\s*${num}(%|deg|grad|rad|turn)?\\s*[,\\s_]\\s*${num}(%)?\\s*[,\\s_]\\s*${num}(%)?`, "gi");
   const hex2 = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0");
   let m;
   while ((m = re.exec(snippet))) {
-    const [, fn, a, , b, bPct, c, cPct] = m;
+    const [, fn, a, aUnit, b, bPct, c, cPct] = m;
     let r, g, bl;
     if (fn[0].toLowerCase() === "r") {
       const channel = (v, pct) => (pct ? (parseFloat(v) * 255) / 100 : parseFloat(v));
-      [r, g, bl] = [channel(a, m[3]), channel(b, bPct), channel(c, cPct)];
+      [r, g, bl] = [channel(a, aUnit === "%"), channel(b, bPct), channel(c, cPct)];
     } else {
-      const h = (((parseFloat(a) % 360) + 360) % 360) / 360;
+      const toDeg = { turn: 360, rad: 180 / Math.PI, grad: 0.9 }[(aUnit || "").toLowerCase()] || 1;
+      const h = ((((parseFloat(a) * toDeg) % 360) + 360) % 360) / 360;
       const sat = Math.min(1, Math.max(0, parseFloat(b) / 100));
       const lig = Math.min(1, Math.max(0, parseFloat(c) / 100));
       const q = lig < 0.5 ? lig * (1 + sat) : lig + sat - lig * sat;
