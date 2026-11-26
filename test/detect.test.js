@@ -1751,6 +1751,29 @@ test("sparkle-icon flags react-icons sparkle names, not unrelated icons", () => 
   }
 });
 
+test("sparkle-icon flags MUI AutoAwesomeIcon and styled variants (issue #227)", () => {
+  const sparkleLines = (src, file = "AiBadge.tsx") => scanSource(src, file).filter((f) => f.rule === "sparkle-icon").map((f) => f.line);
+  // Issue #227 repro:
+  const repro = [
+    'import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";',
+    'import { AutoAwesomeOutlined } from "@mui/icons-material";',
+    "",
+    "export function AiBadge() {",
+    "  return <AutoAwesomeIcon />;",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(sparkleLines(repro), [1, 2, 5]);
+
+  for (const name of ["AutoAwesomeIcon", "AutoAwesomeOutlined", "AutoAwesomeRounded", "AutoAwesomeSharp", "AutoAwesomeTwoTone"]) {
+    assert.deepStrictEqual(sparkleLines(`<${name} />\n`), [1], name);
+  }
+
+  // Unrelated AutoAwesomeMosaic and AutoAwesomeMotion stay quiet
+  for (const name of ["AutoAwesomeMosaic", "AutoAwesomeMotion", "AutoAwesomeMosaicOutlined", "AutoAwesomeMotionRounded"]) {
+    assert.deepStrictEqual(sparkleLines(`<${name} />\n`), [], name);
+  }
+});
+
 test("sparkle-icon flags Font Awesome's wand-magic-sparkles, not the plain wand", () => {
   const sparkleLines = (src) => scanSource(src, "Ai.tsx").filter((f) => f.rule === "sparkle-icon").map((f) => f.line);
   // Issue #198.
