@@ -1521,6 +1521,35 @@ test("hover-scale flags CSS transform translateY lift, but not zero or downward 
   assert.deepStrictEqual(rulesFor(".button:hover { transform: translateY(1px); }\n"), []);
 });
 
+test("hover-scale flags standalone CSS translate property (issue #195)", () => {
+  const rulesFor = (src, file = "card.css") => scanSource(src, file, { kind: "web" }).map((f) => f.rule);
+  // Repro: card.css
+  const repro = [
+    ".card {",
+    "  transition: translate 0.2s ease;",
+    "}",
+    ".card:hover {",
+    "  translate: 0 -4px;",
+    "}",
+    "",
+  ].join("\n");
+  const findings = scanSource(repro, "card.css", { kind: "web" });
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "hover-scale", line: 4 },
+  ]);
+
+  // Length units (px, rem)
+  assert.deepStrictEqual(rulesFor(".card:hover { translate: 0 -0.5rem; }\n"), ["hover-scale"]);
+
+  // Quiet cases
+  assert.deepStrictEqual(rulesFor(".card:hover { translate: 0 0; }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card:hover { translate: 0 2px; }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card:hover { translate: 4px; }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card:hover { --card-translate: 0 -4px; }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card:hover { translate: none; }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card { translate: 0 -4px; }\n"), []);
+});
+
 test("glow-shadow catches Android shadowColor on one line or with alpha", () => {
   const oneLine = '<TextView android:shadowColor="#7C3AED" android:shadowRadius="20" />';
   const multiLine = '<TextView\n    android:shadowColor="#807C3AED"\n    android:shadowRadius="20" />';
