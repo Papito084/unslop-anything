@@ -873,11 +873,12 @@ const rules = [
     find({ code, stack }) {
       // SF Symbols are often derived from "sparkle"/"sparkles" or
       // "wand.and.stars"/"wand.and.sparkles", for example
-      // "sparkles.rectangle.stack" and "wand.and.stars.inverse". Check the
-      // complete string literal so a quoted symbol is only flagged when the
-      // literal is exactly that symbol; substrings and apostrophes inside
-      // longer text stay quiet.
-      const symbol = /^(?:sparkles?(?:\.[a-z0-9._-]+)?|wand\.and\.(?:stars|sparkles)(?:\.[a-z0-9._-]+)?)$/;
+      // "sparkles.rectangle.stack" and "wand.and.stars.inverse". Iconify
+      // names take the form "<set>:sparkles?" or the Nuxt "i-<set>-sparkles?".
+      // Check the complete string literal so a quoted symbol is only flagged
+      // when the literal is exactly that symbol; substrings and apostrophes
+      // inside longer text stay quiet.
+      const symbol = /^(?:sparkles?(?:\.[a-z0-9._-]+)?|wand\.and\.(?:stars|sparkles)(?:\.[a-z0-9._-]+)?|[a-z0-9-]+:sparkles?|i-[a-z0-9-]+-sparkles?)$/;
       const re = /\bauto_awesome\b|\bAutoAwesome\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨/;
       const hits = [...matches(re, code)].map((m) => m.index);
 
