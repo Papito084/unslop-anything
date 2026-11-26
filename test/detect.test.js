@@ -1868,6 +1868,32 @@ test("glow-shadow checks each box-shadow layer independently so a neutral layer 
   for (const [src, file] of quiet) assert.deepStrictEqual(rulesFor(src, file), [], src);
 });
 
+test("glow-shadow catches glowing text-shadow (issue #200)", () => {
+  const rulesFor = (src, file = "title.css") => scanSource(src, file).map((f) => f.rule);
+  // Repro: single layer colored text-shadow
+  const repro = ".title {\n  text-shadow: 0 0 20px #7c3aed;\n}\n";
+  const findings = scanSource(repro, "title.css");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "glow-shadow", line: 2 },
+  ]);
+
+  // Multi-layer text-shadow where only one layer is colored
+  assert.deepStrictEqual(
+    rulesFor(".title { text-shadow: 0 1px 2px #000, 0 0 16px #7c3aed; }\n"),
+    ["glow-shadow"]
+  );
+
+  // Neutral text-shadow stays quiet
+  assert.deepStrictEqual(
+    rulesFor(".title { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }\n"),
+    []
+  );
+  assert.deepStrictEqual(
+    rulesFor(".title { text-shadow: 0 1px 2px #000; }\n"),
+    []
+  );
+});
+
 test("slop-gradient reads UIKit system colors like .systemPurple and .systemPink", () => {
   const rulesFor = (src) => scanSource(src, "Hero.swift").map((f) => f.rule).filter((r) => r === "slop-gradient");
   const gradient = (stops) => `LinearGradient(colors: [${stops}], startPoint: .leading, endPoint: .trailing)\n`;
