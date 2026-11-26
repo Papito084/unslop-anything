@@ -596,6 +596,20 @@ test("slop-gradient reads Tailwind arbitrary hex stops (issue #143)", () => {
   assert.deepStrictEqual(lines('<div class="bg-[#7c3aed] text-white">Hello</div>\n', "Hero.html"), []);
 });
 
+test("slop-gradient reads Tailwind arbitrary rgb() and hsl() stops (issue #173)", () => {
+  const lines = (src, file) => scanSource(src, file).filter((f) => f.rule === "slop-gradient").map((f) => f.line);
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(124,58,237)] to-[rgb(219,39,119)] p-8">Hello</div>\n', "Hero.html"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-linear-to-r from-[hsl(262,83%,58%)] to-[hsl(330,81%,60%)]" />\n', "Hero.tsx"), [1]);
+  // Tailwind writes spaces as underscores
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(124_58_237)] to-[rgb(219_39_119)]" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[hsl(262_83%_58%)] to-[hsl(330_81%_60%)]" />\n', "Hero.tsx"), [1]);
+  // via stop
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-sky-500 via-[rgb(124,58,237)] to-cyan-500" />\n', "Hero.tsx"), [1]);
+  // Non-slop arbitrary rgb stays quiet
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(14,165,233)] to-[rgb(34,197,94)] p-8">Hello</div>\n', "Hero.html"), []);
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(14_165_233)] to-[rgb(34_197_94)] p-8">Hello</div>\n', "Hero.html"), []);
+});
+
 test("slop-gradient reads CSS named colors in the slop band (issue #163)", () => {
   const rulesFor = (src) => scanSource(src, "a.css").map((f) => f.rule).filter((r) => r === "slop-gradient");
   for (const name of ["rebeccapurple", "mediumpurple", "blueviolet", "darkviolet", "darkorchid", "mediumorchid", "hotpink", "deeppink", "mediumvioletred", "RebeccaPurple"]) {

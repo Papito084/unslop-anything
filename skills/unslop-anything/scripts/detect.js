@@ -85,11 +85,12 @@ function hexColors(snippet, stack) {
 
 // rgb()/rgba() and hsl()/hsla() colors in a snippet, as uppercase hex, so they can
 // go through the same checks as hex stops. Commas or spaces both work
-// (`rgb(124, 58, 237)`, `rgb(124 58 237 / 50%)`, `hsl(262 83% 58%)`); alpha is ignored.
+// (`rgb(124, 58, 237)`, `rgb(124 58 237 / 50%)`, `hsl(262 83% 58%)`, or Tailwind
+// `rgb(124_58_237)`); alpha is ignored.
 function cssFunctionColors(snippet) {
   const out = [];
   const num = "([+-]?(?:\\d+\\.?\\d*|\\.\\d+))";
-  const re = new RegExp(`\\b(rgba?|hsla?)\\(\\s*${num}(%|deg)?\\s*[,\\s]\\s*${num}(%)?\\s*[,\\s]\\s*${num}(%)?`, "gi");
+  const re = new RegExp(`\\b(rgba?|hsla?)\\(\\s*${num}(%|deg)?\\s*[,\\s_]\\s*${num}(%)?\\s*[,\\s_]\\s*${num}(%)?`, "gi");
   const hex2 = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0");
   let m;
   while ((m = re.exec(snippet))) {
@@ -699,9 +700,9 @@ const rules = [
             break;
           }
         }
-        // Arbitrary stops carry the color itself: from-[#7c3aed] to-[#db2777].
-        const arbitrary = [...scope.matchAll(/\b(?:from|via|to)-\[(#[0-9a-fA-F]{3,8})\]/g)].map((s) => s[1]).join(" ");
-        if (/\b(?:from|via|to)-(?:purple|violet|indigo|fuchsia|pink)-\d{2,3}\b/.test(scope) || hexColors(arbitrary, stack).some(isSlopHue)) hits.push(m.index);
+        // Arbitrary stops carry the color itself: from-[#7c3aed], from-[rgb(...)], from-[hsl(...)].
+        const arbitrary = [...scope.matchAll(/\b(?:from|via|to)-\[([^\]]+)\]/g)].map((s) => s[1].replace(/_/g, " ")).join(" ");
+        if (/\b(?:from|via|to)-(?:purple|violet|indigo|fuchsia|pink)-\d{2,3}\b/.test(scope) || [...hexColors(arbitrary, stack), ...cssFunctionColors(arbitrary)].some(isSlopHue)) hits.push(m.index);
       }
       return hits;
     },
