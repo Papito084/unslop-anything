@@ -1241,6 +1241,36 @@ test("nested-cards reads opening tags with tagEnd so arrows or > in props do not
   assert.deepStrictEqual(rulesFor('<ion-card title="a > b"><ion-card></ion-card></ion-card>\n', "a.html"), ["nested-cards"]);
 });
 
+test("nested-cards flags Vuetify v-card and Angular Material mat-card (issue #202)", () => {
+  const rulesFor = (src, file) => scanSource(src, file).map((f) => f.rule);
+  // Repro: Vuetify <v-card> inside <v-card> in Plans.vue
+  const vuetifyRepro = [
+    "<template>",
+    "  <v-card>",
+    '    <v-card title="Pro plan"></v-card>',
+    "  </v-card>",
+    "</template>",
+    "",
+  ].join("\n");
+  const vuetifyFindings = scanSource(vuetifyRepro, "Plans.vue");
+  assert.deepStrictEqual(vuetifyFindings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "nested-cards", line: 2 },
+  ]);
+
+  // Angular Material <mat-card> inside <mat-card> in plans.component.html
+  assert.deepStrictEqual(
+    rulesFor("<mat-card><mat-card>Pro plan</mat-card></mat-card>", "plans.component.html"),
+    ["nested-cards"]
+  );
+
+  // Card parts stay quiet
+  const vuetifyParts = "<v-card><v-card-title>Title</v-card-title><v-card-text>Content</v-card-text></v-card>";
+  assert.deepStrictEqual(rulesFor(vuetifyParts, "Plans.vue"), []);
+
+  const angularParts = "<mat-card><mat-card-header><mat-card-title>Title</mat-card-title></mat-card-header><mat-card-content>Content</mat-card-content></mat-card>";
+  assert.deepStrictEqual(rulesFor(angularParts, "plans.component.html"), []);
+});
+
 test("img-no-alt accepts Angular [alt] bindings and Svelte {alt} shorthand", () => {
   const rulesFor = (src, file) => scanSource(src, file).map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<img [src]="u.avatar" [alt]="u.name">\n', "a.component.html"), []);
