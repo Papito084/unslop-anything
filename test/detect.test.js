@@ -418,6 +418,17 @@ test("horizontal={false} is still a vertical list", () => {
   assert.deepStrictEqual(scanSource(src, "a.tsx").map((f) => f.rule), ["unvirtualized-list"]);
 });
 
+test("unvirtualized-list reads ScrollView props with tagEnd so arrows before horizontal stay quiet", () => {
+  const rulesFor = (src) => scanSource(src, "a.tsx").filter((f) => f.rule === "unvirtualized-list").map((f) => f.line);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} horizontal>{chips.map((c) => <Chip key={c} />)}</ScrollView>\n"), []);
+  assert.deepStrictEqual(rulesFor("<ScrollView style={{ padding: count > 0 ? 8 : 0 }} horizontal>{chips.map((c) => <Chip key={c} />)}</ScrollView>\n"), []);
+  assert.deepStrictEqual(rulesFor("<ScrollView stickyHeaderIndices={headers.map((_, i) => i)}><Text>Static</Text></ScrollView>\n"), []);
+  // Vertical ScrollViews with arrow props still flag, and a self-closing ScrollView does not swallow a later one.
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)}>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [1]);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} horizontal={false}>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [1]);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} />\n<ScrollView>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [2]);
+});
+
 test("Android color resources reach template-theme", () => {
   const src = '<resources>\n  <color name="purple_500">#6200EE</color>\n</resources>\n';
   assert.deepStrictEqual(scanSource(src, "colors.xml").map((f) => f.rule), ["template-theme"]);

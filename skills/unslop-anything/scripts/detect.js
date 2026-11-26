@@ -1054,12 +1054,16 @@ const rules = [
       const hits = [];
       if (stack === "js") {
         for (const m of matches(/(?<![\w.])<(?:Animated\.)?ScrollView\b/, code)) {
-          const end = code.slice(m.index).search(/<\/(?:Animated\.)?ScrollView>/);
-          if (end === -1) continue;
-          const body = code.slice(m.index, m.index + end);
+          const openEnd = tagEnd(code, m.index + m[0].length);
+          if (openEnd === -1) continue;
+          if (/\/\s*$/.test(code.slice(m.index + m[0].length, openEnd))) continue;
+          const rest = code.slice(openEnd + 1);
+          const closeRel = rest.search(/<\/(?:Animated\.)?ScrollView>/);
+          if (closeRel === -1) continue;
           // Horizontal scrollers are usually short chip rows and carousels.
-          const props = body.slice(0, body.indexOf(">") + 1);
+          const props = code.slice(m.index, openEnd + 1);
           if (/\bhorizontal\b(?!\s*=\s*\{\s*false\s*\})/.test(props)) continue;
+          const body = rest.slice(0, closeRel);
           if (/\.map\(/.test(body)) hits.push(m.index);
         }
       }
