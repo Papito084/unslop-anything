@@ -651,6 +651,53 @@ test("slop-gradient reads Tailwind arbitrary hex stops (issue #143)", () => {
   assert.deepStrictEqual(lines('<div class="bg-[#7c3aed] text-white">Hello</div>\n', "Hero.html"), []);
 });
 
+test("slop-gradient reads Tailwind arbitrary rgb() and hsl() stops (issue #173)", () => {
+  const lines = (src, file) => scanSource(src, file).filter((f) => f.rule === "slop-gradient").map((f) => f.line);
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(124,58,237)] to-[rgb(219,39,119)] p-8">Hello</div>\n', "Hero.html"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-linear-to-r from-[hsl(262,83%,58%)] to-[hsl(330,81%,60%)]" />\n', "Hero.tsx"), [1]);
+  // Tailwind writes spaces as underscores
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(124_58_237)] to-[rgb(219_39_119)]" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[hsl(262_83%_58%)] to-[hsl(330_81%_60%)]" />\n', "Hero.tsx"), [1]);
+  // via stop
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-sky-500 via-[rgb(124,58,237)] to-cyan-500" />\n', "Hero.tsx"), [1]);
+  // Non-slop arbitrary rgb stays quiet
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(14,165,233)] to-[rgb(34,197,94)] p-8">Hello</div>\n', "Hero.html"), []);
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(14_165_233)] to-[rgb(34_197_94)] p-8">Hello</div>\n', "Hero.html"), []);
+  assert.deepStrictEqual(lines('<div className="bg-linear-to-r from-[#0ea5e9] via-[rgba(124,58,237,0.8)] to-[#22c55e]" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(124_58_237_/_50%)] to-white" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[hsl(199_89%_48%)] to-[hsl(142_71%_45%)]" />\n', "Hero.tsx"), []);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(0,0,0)] to-[rgb(255,255,255)]" />\n', "Hero.tsx"), []);
+  // An rgb() purple outside a gradient stop is not a stop.
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-sky-500 to-cyan-500 shadow-[0_0_8px_rgb(124,58,237)]" />\n', "Hero.tsx"), []);
+});
+
+test("slop-gradient reads hsl() hues in turn, rad and grad (issue #173)", () => {
+  const lines = (src, file) => scanSource(src, file).filter((f) => f.rule === "slop-gradient").map((f) => f.line);
+  const div = (classes) => `export default function Hero() {\n  return <div className="${classes}">Hi</div>;\n}\n`;
+  // All of these are the same purple: a hue of 270deg.
+  const flagged = [
+    "bg-gradient-to-r from-[hsl(270deg_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(0.75turn_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(4.7124rad,100%,50%)] to-white",
+    "bg-gradient-to-r from-[hsl(300grad_100%_50%)] to-white",
+    // Hues wrap: -90deg, -0.25turn and 1.75turn are 270deg too.
+    "bg-gradient-to-r from-[hsl(-90deg_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(-0.25turn_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsla(1.75turn,100%,50%,0.5)] to-white",
+  ];
+  for (const classes of flagged) assert.deepStrictEqual(lines(div(classes), "Hero.tsx"), [2], classes);
+  // A cyan hue of 180deg, in each unit, stays quiet.
+  const quiet = [
+    "bg-gradient-to-r from-[hsl(180deg_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(0.5turn_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(3.1416rad,100%,50%)] to-white",
+    "bg-gradient-to-r from-[hsl(200grad_100%_50%)] to-white",
+    // A bare number is degrees, not turns: 0.75 is a red.
+    "bg-gradient-to-r from-[hsl(0.75_100%_50%)] to-white",
+  ];
+  for (const classes of quiet) assert.deepStrictEqual(lines(div(classes), "Hero.tsx"), [], classes);
+});
+
 test("slop-gradient reads CSS named colors in the slop band (issue #163)", () => {
   const rulesFor = (src) => scanSource(src, "a.css").map((f) => f.rule).filter((r) => r === "slop-gradient");
   for (const name of ["rebeccapurple", "mediumpurple", "blueviolet", "darkviolet", "darkorchid", "mediumorchid", "hotpink", "deeppink", "mediumvioletred", "RebeccaPurple"]) {
