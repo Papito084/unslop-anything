@@ -90,6 +90,35 @@ test("safe-area-off flags .ignoresSafeArea(.all) forms, not backgrounds", () => 
   assert.deepStrictEqual(scanSource("VStack { }.ignoresSafeArea(edges: .top)", "a.swift"), []);
 });
 
+test("safe-area-off skips multi-line background receivers without hiding container views", () => {
+  const lines = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "safe-area-off").map((f) => f.line);
+  const quiet = [
+    "ZStack {\n  Color.black\n    .ignoresSafeArea()\n}\n",
+    "Color.black\n  .opacity(0.8)\n  .ignoresSafeArea()\n",
+    "Color.black\n  .edgesIgnoringSafeArea(.all)\n",
+    "LinearGradient(\n  colors: [.black, .clear],\n  startPoint: .top,\n  endPoint: .bottom\n)\n  .ignoresSafeArea()\n",
+    "VStack {\n  Text(\"Hi\")\n}\n.background(LinearGradient(colors: [.white, .gray],\n  startPoint: .center, endPoint: .bottom).ignoresSafeArea())\n",
+    "VStack {\n  Text(\"Hi\")\n}\n.background {\n  backdrop\n    .ignoresSafeArea()\n}\n",
+    "Image(\"hero\")\n  .resizable()\n  .scaledToFill()\n  .ignoresSafeArea()\n",
+    "Rectangle()\n  .fill(.black)\n  .ignoresSafeArea()\n",
+    "SwiftUI.Color.black\n  .ignoresSafeArea()\n",
+    "AsyncImage(url: url)\n  .ignoresSafeArea()\n",
+    "KFImage(url)\n  .resizable()\n  .ignoresSafeArea()\n",
+    "Color.theme.accent\n  .ignoresSafeArea()\n",
+    "Color.brand.primary\n  .opacity(0.5)\n  .ignoresSafeArea()\n",
+    "heroGradient\n  .ignoresSafeArea()\n",
+    "backgroundLayer()\n  .ignoresSafeArea()\n",
+    "backgroundImage?.resizable()\n  .ignoresSafeArea()\n",
+  ];
+  for (const src of quiet) assert.deepStrictEqual(lines(src), [], src);
+  // Real container views still flag, even when they contain a Color or follow a .background modifier.
+  assert.deepStrictEqual(lines("VStack {\n  Color.red\n  Text(\"Content\")\n}\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("VStack {\n  Text(\"Content\")\n}\n.background(Color.white)\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("VStack {\n  Text(\"Content\")\n}\n.background { Color.white }\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("Text(\"Hi\").foregroundStyle(Color.red).ignoresSafeArea()\n"), [1]);
+  assert.deepStrictEqual(lines("ZStack {\n  Color.black\n    .ignoresSafeArea()\n  VStack {\n    Text(\"Hi\")\n  }\n  .ignoresSafeArea()\n}\n"), [7]);
+});
+
 test("fixed-text-size skips Swift files that build for macOS only", () => {
   const rulesOf = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "fixed-text-size").map((f) => f.line);
   const text = 'Text("Hi").font(.system(size: 13))\n';
@@ -389,6 +418,17 @@ test("horizontal={false} is still a vertical list", () => {
   assert.deepStrictEqual(scanSource(src, "a.tsx").map((f) => f.rule), ["unvirtualized-list"]);
 });
 
+test("unvirtualized-list reads ScrollView props with tagEnd so arrows before horizontal stay quiet", () => {
+  const rulesFor = (src) => scanSource(src, "a.tsx").filter((f) => f.rule === "unvirtualized-list").map((f) => f.line);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} horizontal>{chips.map((c) => <Chip key={c} />)}</ScrollView>\n"), []);
+  assert.deepStrictEqual(rulesFor("<ScrollView style={{ padding: count > 0 ? 8 : 0 }} horizontal>{chips.map((c) => <Chip key={c} />)}</ScrollView>\n"), []);
+  assert.deepStrictEqual(rulesFor("<ScrollView stickyHeaderIndices={headers.map((_, i) => i)}><Text>Static</Text></ScrollView>\n"), []);
+  // Vertical ScrollViews with arrow props still flag, and a self-closing ScrollView does not swallow a later one.
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)}>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [1]);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} horizontal={false}>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [1]);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} />\n<ScrollView>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [2]);
+});
+
 test("Android color resources reach template-theme", () => {
   const src = '<resources>\n  <color name="purple_500">#6200EE</color>\n</resources>\n';
   assert.deepStrictEqual(scanSource(src, "colors.xml").map((f) => f.rule), ["template-theme"]);
@@ -444,6 +484,21 @@ test("vague-button catches Swift, Compose and Flutter buttons", () => {
   // Specific labels stay quiet.
   assert.deepStrictEqual(scanSource('Button("Save address")', "a.swift"), []);
   assert.deepStrictEqual(scanSource('Text("Save address")', "a.kt"), []);
+});
+
+test("vague-button catches SwiftUI trailing-closure Button { ... } label: { ... }", () => {
+  const lines = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "vague-button").map((f) => f.line);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  Text("Submit")\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  HStack { Image(systemName: "arrow.right"); Text("Click here") }\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  Label("Tap here", systemImage: "hand.tap")\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button(role: .destructive) {\n  deleteAll()\n} label: {\n  Text("Submit")\n}\n'), [1]);
+  // Specific labels stay quiet even when the action closure mentions a vague word.
+  assert.deepStrictEqual(lines('Button {\n  analytics.track("Submit")\n  let unused = Text("Submit")\n} label: {\n  Text("Save address")\n}\n'), []);
+  assert.deepStrictEqual(lines('Button(role: .destructive) {\n  log("Submit")\n} label: {\n  Text("Delete account")\n}\n'), []);
+  // A type named Button without a trailing label closure is not a SwiftUI button call,
+  // and a lowercase helper like label("Submit") is not SwiftUI's Label view.
+  assert.deepStrictEqual(lines('struct Button {\n  let title = Text("Submit")\n}\n'), []);
+  assert.deepStrictEqual(lines('Button("Save") { label("Submit") }\n'), []);
 });
 
 test("vague-button reads the value of a submit or button input (issue #145)", () => {
@@ -594,6 +649,53 @@ test("slop-gradient reads Tailwind arbitrary hex stops (issue #143)", () => {
   assert.deepStrictEqual(lines('<div className={cn("after:content-[\')\']", "bg-gradient-to-r", "from-[#7c3aed]")} />\n', "Hero.tsx"), [1]);
   // A purple outside a gradient class string is not a stop.
   assert.deepStrictEqual(lines('<div class="bg-[#7c3aed] text-white">Hello</div>\n', "Hero.html"), []);
+});
+
+test("slop-gradient reads Tailwind arbitrary rgb() and hsl() stops (issue #173)", () => {
+  const lines = (src, file) => scanSource(src, file).filter((f) => f.rule === "slop-gradient").map((f) => f.line);
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(124,58,237)] to-[rgb(219,39,119)] p-8">Hello</div>\n', "Hero.html"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-linear-to-r from-[hsl(262,83%,58%)] to-[hsl(330,81%,60%)]" />\n', "Hero.tsx"), [1]);
+  // Tailwind writes spaces as underscores
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(124_58_237)] to-[rgb(219_39_119)]" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[hsl(262_83%_58%)] to-[hsl(330_81%_60%)]" />\n', "Hero.tsx"), [1]);
+  // via stop
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-sky-500 via-[rgb(124,58,237)] to-cyan-500" />\n', "Hero.tsx"), [1]);
+  // Non-slop arbitrary rgb stays quiet
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(14,165,233)] to-[rgb(34,197,94)] p-8">Hello</div>\n', "Hero.html"), []);
+  assert.deepStrictEqual(lines('<div class="bg-gradient-to-r from-[rgb(14_165_233)] to-[rgb(34_197_94)] p-8">Hello</div>\n', "Hero.html"), []);
+  assert.deepStrictEqual(lines('<div className="bg-linear-to-r from-[#0ea5e9] via-[rgba(124,58,237,0.8)] to-[#22c55e]" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(124_58_237_/_50%)] to-white" />\n', "Hero.tsx"), [1]);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[hsl(199_89%_48%)] to-[hsl(142_71%_45%)]" />\n', "Hero.tsx"), []);
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-[rgb(0,0,0)] to-[rgb(255,255,255)]" />\n', "Hero.tsx"), []);
+  // An rgb() purple outside a gradient stop is not a stop.
+  assert.deepStrictEqual(lines('<div className="bg-gradient-to-r from-sky-500 to-cyan-500 shadow-[0_0_8px_rgb(124,58,237)]" />\n', "Hero.tsx"), []);
+});
+
+test("slop-gradient reads hsl() hues in turn, rad and grad (issue #173)", () => {
+  const lines = (src, file) => scanSource(src, file).filter((f) => f.rule === "slop-gradient").map((f) => f.line);
+  const div = (classes) => `export default function Hero() {\n  return <div className="${classes}">Hi</div>;\n}\n`;
+  // All of these are the same purple: a hue of 270deg.
+  const flagged = [
+    "bg-gradient-to-r from-[hsl(270deg_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(0.75turn_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(4.7124rad,100%,50%)] to-white",
+    "bg-gradient-to-r from-[hsl(300grad_100%_50%)] to-white",
+    // Hues wrap: -90deg, -0.25turn and 1.75turn are 270deg too.
+    "bg-gradient-to-r from-[hsl(-90deg_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(-0.25turn_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsla(1.75turn,100%,50%,0.5)] to-white",
+  ];
+  for (const classes of flagged) assert.deepStrictEqual(lines(div(classes), "Hero.tsx"), [2], classes);
+  // A cyan hue of 180deg, in each unit, stays quiet.
+  const quiet = [
+    "bg-gradient-to-r from-[hsl(180deg_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(0.5turn_100%_50%)] to-white",
+    "bg-gradient-to-r from-[hsl(3.1416rad,100%,50%)] to-white",
+    "bg-gradient-to-r from-[hsl(200grad_100%_50%)] to-white",
+    // A bare number is degrees, not turns: 0.75 is a red.
+    "bg-gradient-to-r from-[hsl(0.75_100%_50%)] to-white",
+  ];
+  for (const classes of quiet) assert.deepStrictEqual(lines(div(classes), "Hero.tsx"), [], classes);
 });
 
 test("slop-gradient reads CSS named colors in the slop band (issue #163)", () => {
@@ -1127,6 +1229,18 @@ test("nested-cards ignores dotted subcomponents and ion-card parts, still flags 
   assert.deepStrictEqual(rulesFor("<ion-card><ion-card></ion-card></ion-card>", "a.html"), ["nested-cards"]);
 });
 
+test("nested-cards reads opening tags with tagEnd so arrows or > in props do not misread sibling cards", () => {
+  const rulesFor = (src, file = "a.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()} />\n<Card><p>Second</p></Card>\n"), []);
+  assert.deepStrictEqual(rulesFor('<Card title="a > b" />\n<Card><p>Second</p></Card>\n'), []);
+  assert.deepStrictEqual(rulesFor("<Card disabled={count > 0} />\n<Card><p>Second</p></Card>\n"), []);
+  // Real nested cards with arrows or nested JSX in props still flag.
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()}>\n  <Card><p>Inner</p></Card>\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()}>\n  <Card />\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor("<Card header={<span />}>\n  <Card><p>Inner</p></Card>\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor('<ion-card title="a > b"><ion-card></ion-card></ion-card>\n', "a.html"), ["nested-cards"]);
+});
+
 test("img-no-alt accepts Angular [alt] bindings and Svelte {alt} shorthand", () => {
   const rulesFor = (src, file) => scanSource(src, file).map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<img [src]="u.avatar" [alt]="u.name">\n', "a.component.html"), []);
@@ -1399,6 +1513,14 @@ test("hover-scale flags standalone CSS scale at 1.02 and above, not neutral, shr
   assert.deepStrictEqual(rulesFor(".card:hover { custom-scale: 1.1; }\n"), []);
 });
 
+test("hover-scale flags CSS transform translateY lift, but not zero or downward presses", () => {
+  const rulesFor = (src) => scanSource(src, "a.css", { kind: "web" }).map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateY(-4px); }\n"), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateY(-0.5rem); }\n"), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateY(0); }\n"), []);
+  assert.deepStrictEqual(rulesFor(".button:hover { transform: translateY(1px); }\n"), []);
+});
+
 test("glow-shadow catches Android shadowColor on one line or with alpha", () => {
   const oneLine = '<TextView android:shadowColor="#7C3AED" android:shadowRadius="20" />';
   const multiLine = '<TextView\n    android:shadowColor="#807C3AED"\n    android:shadowRadius="20" />';
@@ -1419,6 +1541,10 @@ test("sparkle-icon flags the singular and combined icon names", () => {
   assert.deepStrictEqual(rulesFor("<WandSparklesIcon />\n"), ["sparkle-icon"]);
   // Still flagged, as before.
   assert.deepStrictEqual(rulesFor("<Sparkles />\n"), ["sparkle-icon"]);
+  // Tabler IconSparkles
+  assert.deepStrictEqual(rulesFor("<IconSparkles />\n"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor('import { IconSparkles } from "@tabler/icons-react";\n'), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor("<IconStar />\n"), []);
   // A word that only contains the letters is a different component, not a
   // sparkle icon: word boundaries keep SparkleCounter unflagged.
   assert.deepStrictEqual(rulesFor("<SparkleCounter />\n"), []);
@@ -1466,6 +1592,23 @@ test("sparkle-icon scans nested Swift interpolation and raw strings", () => {
 
   const prose = "let label = #\"Use \"'sparkles'\" as text\"#";
   assert.deepStrictEqual(scanSource(prose, "a.swift"), []);
+});
+
+test("sparkle-icon flags Iconify and Nuxt sparkle icon names, not prose or unrelated icons", () => {
+  const vue = [
+    "<template>",
+    '  <Icon icon="lucide:sparkles" />',
+    '  <UIcon name="i-lucide-sparkles" />',
+    '  <Icon icon="mdi:sparkle" />',
+    '  <Icon icon="heroicons:sparkles" />',
+    '  <Icon icon="ph:sparkle" />',
+    '  <Icon icon="tabler:sparkles" />',
+    '  <p>Add some sparkles</p>',
+    '  <Icon icon="lucide:star" />',
+    "</template>",
+  ].join("\n");
+  const findings = scanSource(vue, "Badge.vue").filter((f) => f.rule === "sparkle-icon");
+  assert.deepStrictEqual(findings.map((f) => f.line), [2, 3, 4, 5, 6, 7]);
 });
 
 test("blankComments keeps slashes inside Swift raw strings and still finds later symbols", () => {
@@ -1701,6 +1844,71 @@ test("slop-gradient reads SwiftUI Color(red:green:blue:) stops (issue #162)", ()
     "Color(red: 0, green: 0, blue: 0), Color(red: 1, green: 1, blue: 1)",
     // A component that is not a number cannot be read.
     "Color(red: r, green: g, blue: b), Color(red: tint.r, green: 0.23, blue: 0.93)",
+  ];
+  for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});
+
+test("glow-shadow checks each box-shadow layer independently so a neutral layer does not hide a colored glow", () => {
+  const rulesFor = (src, file = "a.css") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.rule);
+  const flagged = [
+    [".card { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 24px rgba(124, 58, 237, 0.5); }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px #000, 0 0 20px #7c3aed; }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px black, 0 0 20px purple; }\n", "a.css"],
+    [".card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 28px rgb(139 92 246 / 0.5); }\n", "a.css"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_40px_#7c3aed]">x</div>\n', "a.tsx"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_40px_rgba(124,58,237,0.5)]">x</div>\n', "a.tsx"],
+  ];
+  for (const [src, file] of flagged) assert.deepStrictEqual(rulesFor(src, file), ["glow-shadow"], src);
+  const quiet = [
+    [".card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1); }\n", "a.css"],
+    [".card { box-shadow: inset 2px 0 0 #e0763f, 0 1px 2px rgba(0, 0, 0, 0.2); }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px black, 0 4px 12px #00000040; }\n", "a.css"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_8px_rgba(128,128,128,0.3)]">x</div>\n', "a.tsx"],
+  ];
+  for (const [src, file] of quiet) assert.deepStrictEqual(rulesFor(src, file), [], src);
+});
+
+test("slop-gradient reads UIKit system colors like .systemPurple and .systemPink", () => {
+  const rulesFor = (src) => scanSource(src, "Hero.swift").map((f) => f.rule).filter((r) => r === "slop-gradient");
+  const gradient = (stops) => `LinearGradient(colors: [${stops}], startPoint: .leading, endPoint: .trailing)\n`;
+  const flagged = [
+    "Color(.systemPurple), Color(.systemPink)",
+    "Color(uiColor: .systemIndigo), Color(uiColor: .systemPink)",
+    "UIColor.systemPurple, UIColor.systemPink",
+    ".systemPurple, .systemPink",
+    ".systemIndigo, .white",
+  ];
+  for (const stops of flagged) assert.deepStrictEqual(rulesFor(gradient(stops)), ["slop-gradient"], stops);
+
+  const quiet = [
+    "Color(.systemTeal), Color(.systemBlue)",
+    "Color(uiColor: .systemTeal), Color(uiColor: .systemBlue)",
+    "UIColor.systemGreen, UIColor.systemBlue",
+  ];
+  for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});
+
+test("slop-gradient reads Compose Color(red = ..., green = ..., blue = ...) stops (issue #174)", () => {
+  const rulesFor = (src) => scanSource(src, "Hero.kt").map((f) => f.rule).filter((r) => r === "slop-gradient");
+  const gradient = (stops) => `Box(Modifier.background(Brush.linearGradient(listOf(${stops}))))\n`;
+  const flagged = [
+    "Color(red = 124, green = 58, blue = 237), Color(red = 219, green = 39, blue = 119)",
+    "Color(red = 0.49f, green = 0.23f, blue = 0.93f), Color(red = 0.86f, green = 0.15f, blue = 0.47f)",
+    "Color(red = 124, green = 58, blue = 237, alpha = 255), Color.White",
+    "Color(red = 0.49f, green = 0.23f, blue = 0.93f, alpha = 0.8f), Color.White",
+    // Trailing comma
+    "Color(red = 124, green = 58, blue = 237,), Color.White",
+    // Multiline
+    "Color(\n      red = 124,\n      green = 58,\n      blue = 237\n    ), Color.White",
+  ];
+  for (const stops of flagged) assert.deepStrictEqual(rulesFor(gradient(stops)), ["slop-gradient"], stops);
+
+  const quiet = [
+    "Color(red = 14, green = 165, blue = 233), Color(red = 34, green = 197, blue = 94)",
+    "Color(red = 0.05f, green = 0.65f, blue = 0.91f), Color(red = 0.13f, green = 0.77f, blue = 0.37f)",
+    "Color(red = 0, green = 0, blue = 0), Color(red = 255, green = 255, blue = 255)",
+    // A component that is a variable cannot be read.
+    "Color(red = r, green = g, blue = b), Color(red = redVar, green = 58, blue = 237)",
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
