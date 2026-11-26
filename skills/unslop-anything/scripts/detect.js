@@ -183,8 +183,8 @@ function isSaturated(hex) {
 }
 
 // Also the CSS named colors in that band (rebeccapurple, hotpink, ...), which a
-// plain \bpurple\b or \bpink\b does not reach.
-const SLOP_COLOR_NAME = /(?:\.|Colors\.|Color\.|\b)(purple|deepPurple|indigo|violet|pink|magenta|fuchsia|rebeccapurple|mediumpurple|blueviolet|darkviolet|darkorchid|mediumorchid|hotpink|deeppink|mediumvioletred)\b/i;
+// plain \bpurple\b or \bpink\b does not reach, and UIKit system colors (.systemPurple, ...).
+const SLOP_COLOR_NAME = /(?:\.|Colors\.|Color\.|\b)(?:system)?(purple|deepPurple|indigo|violet|pink|magenta|fuchsia|rebeccapurple|mediumpurple|blueviolet|darkviolet|darkorchid|mediumorchid|hotpink|deeppink|mediumvioletred)\b/i;
 
 // Replace comments with spaces, keeping offsets and newlines, so rules never
 // match commented-out code. Strings are kept.

@@ -1684,3 +1684,23 @@ test("slop-gradient reads SwiftUI Color(red:green:blue:) stops (issue #162)", ()
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
+
+test("slop-gradient reads UIKit system colors like .systemPurple and .systemPink", () => {
+  const rulesFor = (src) => scanSource(src, "Hero.swift").map((f) => f.rule).filter((r) => r === "slop-gradient");
+  const gradient = (stops) => `LinearGradient(colors: [${stops}], startPoint: .leading, endPoint: .trailing)\n`;
+  const flagged = [
+    "Color(.systemPurple), Color(.systemPink)",
+    "Color(uiColor: .systemIndigo), Color(uiColor: .systemPink)",
+    "UIColor.systemPurple, UIColor.systemPink",
+    ".systemPurple, .systemPink",
+    ".systemIndigo, .white",
+  ];
+  for (const stops of flagged) assert.deepStrictEqual(rulesFor(gradient(stops)), ["slop-gradient"], stops);
+
+  const quiet = [
+    "Color(.systemTeal), Color(.systemBlue)",
+    "Color(uiColor: .systemTeal), Color(uiColor: .systemBlue)",
+    "UIColor.systemGreen, UIColor.systemBlue",
+  ];
+  for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});
