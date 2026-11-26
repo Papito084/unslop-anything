@@ -1573,6 +1573,19 @@ test("hover-scale flags translate() and translate3d() lifts, not zero, downward,
   assert.deepStrictEqual(rulesFor(".card { transform: translate(0, -6px); }\n"), []);
 });
 
+test("hover-scale flags scale() after another transform function and scale3d() (issue #232)", () => {
+  const rulesFor = (src) => scanSource(src, "a.css", { kind: "web" }).map((f) => f.rule);
+  // Issue #232 repro: chained scale and scale3d in two hover blocks
+  const repro = ".card:hover {\n  transform: rotate(-1deg) scale(1.05);\n}\n.tile:hover {\n  transform: scale3d(1.05, 1.05, 1);\n}\n";
+  assert.deepStrictEqual(scanSource(repro, "card.css", { kind: "web" }).map((f) => [f.rule, f.line]), [["hover-scale", 1], ["hover-scale", 4]]);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: rotate(-1deg) scale(1.05); }\n"), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor(".tile:hover { transform: scale3d(1.05, 1.05, 1); }\n"), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: rotate(2deg) scale(0.98); }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateX(2px) scale(1.01); }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: scale3d(1, 1, 1); }\n"), []);
+  assert.deepStrictEqual(rulesFor(".card { transform: scale(1.05); }\n"), []);
+});
+
 test("hover-scale flags a standalone translate lift, not zero, downward, x-only, or longer property names", () => {
   const rulesFor = (src) => scanSource(src, "a.css", { kind: "web" }).map((f) => f.rule);
   // Issue #195: the repro.
