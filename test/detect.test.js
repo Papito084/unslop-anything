@@ -1550,6 +1550,38 @@ test("sparkle-icon flags the singular and combined icon names", () => {
   assert.deepStrictEqual(rulesFor("<SparkleCounter />\n"), []);
 });
 
+test("sparkle-icon flags react-icons names like HiSparkles and MdAutoAwesome (issue #197)", () => {
+  const rulesFor = (src, file = "Ai.tsx") => scanSource(src, file).map((f) => f.rule);
+  // Repro: Ai.tsx
+  const repro = [
+    'import { HiSparkles } from "react-icons/hi2";',
+    'import { MdAutoAwesome } from "react-icons/md";',
+    "",
+    "export function AiBadge() {",
+    "  return <HiSparkles />;",
+    "}",
+    "",
+  ].join("\n");
+  const findings = scanSource(repro, "Ai.tsx");
+  assert.deepStrictEqual(findings.map((f) => ({ rule: f.rule, line: f.line })), [
+    { rule: "sparkle-icon", line: 1 },
+    { rule: "sparkle-icon", line: 2 },
+    { rule: "sparkle-icon", line: 5 },
+  ]);
+
+  // Other react-icons sparkle variations
+  assert.deepStrictEqual(rulesFor("<HiOutlineSparkles />\n"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor("<LuSparkles />\n"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor("<TbSparkles />\n"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor("<PiSparkle />\n"), ["sparkle-icon"]);
+  assert.deepStrictEqual(rulesFor("<MdOutlineAutoAwesome />\n"), ["sparkle-icon"]);
+
+  // Quiet cases: other react-icons and word boundaries
+  assert.deepStrictEqual(rulesFor("<HiStar />\n"), []);
+  assert.deepStrictEqual(rulesFor("<MdAutoGraph />\n"), []);
+  assert.deepStrictEqual(rulesFor("<SparkleCounter />\n"), []);
+});
+
 test("sparkle-icon flags sparkle-derived SF Symbols but not words containing sparkles", () => {
   const src = [
     "import SwiftUI",
