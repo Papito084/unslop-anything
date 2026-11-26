@@ -90,6 +90,35 @@ test("safe-area-off flags .ignoresSafeArea(.all) forms, not backgrounds", () => 
   assert.deepStrictEqual(scanSource("VStack { }.ignoresSafeArea(edges: .top)", "a.swift"), []);
 });
 
+test("safe-area-off skips multi-line background receivers without hiding container views", () => {
+  const lines = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "safe-area-off").map((f) => f.line);
+  const quiet = [
+    "ZStack {\n  Color.black\n    .ignoresSafeArea()\n}\n",
+    "Color.black\n  .opacity(0.8)\n  .ignoresSafeArea()\n",
+    "Color.black\n  .edgesIgnoringSafeArea(.all)\n",
+    "LinearGradient(\n  colors: [.black, .clear],\n  startPoint: .top,\n  endPoint: .bottom\n)\n  .ignoresSafeArea()\n",
+    "VStack {\n  Text(\"Hi\")\n}\n.background(LinearGradient(colors: [.white, .gray],\n  startPoint: .center, endPoint: .bottom).ignoresSafeArea())\n",
+    "VStack {\n  Text(\"Hi\")\n}\n.background {\n  backdrop\n    .ignoresSafeArea()\n}\n",
+    "Image(\"hero\")\n  .resizable()\n  .scaledToFill()\n  .ignoresSafeArea()\n",
+    "Rectangle()\n  .fill(.black)\n  .ignoresSafeArea()\n",
+    "SwiftUI.Color.black\n  .ignoresSafeArea()\n",
+    "AsyncImage(url: url)\n  .ignoresSafeArea()\n",
+    "KFImage(url)\n  .resizable()\n  .ignoresSafeArea()\n",
+    "Color.theme.accent\n  .ignoresSafeArea()\n",
+    "Color.brand.primary\n  .opacity(0.5)\n  .ignoresSafeArea()\n",
+    "heroGradient\n  .ignoresSafeArea()\n",
+    "backgroundLayer()\n  .ignoresSafeArea()\n",
+    "backgroundImage?.resizable()\n  .ignoresSafeArea()\n",
+  ];
+  for (const src of quiet) assert.deepStrictEqual(lines(src), [], src);
+  // Real container views still flag, even when they contain a Color or follow a .background modifier.
+  assert.deepStrictEqual(lines("VStack {\n  Color.red\n  Text(\"Content\")\n}\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("VStack {\n  Text(\"Content\")\n}\n.background(Color.white)\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("VStack {\n  Text(\"Content\")\n}\n.background { Color.white }\n.ignoresSafeArea()\n"), [5]);
+  assert.deepStrictEqual(lines("Text(\"Hi\").foregroundStyle(Color.red).ignoresSafeArea()\n"), [1]);
+  assert.deepStrictEqual(lines("ZStack {\n  Color.black\n    .ignoresSafeArea()\n  VStack {\n    Text(\"Hi\")\n  }\n  .ignoresSafeArea()\n}\n"), [7]);
+});
+
 test("fixed-text-size skips Swift files that build for macOS only", () => {
   const rulesOf = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "fixed-text-size").map((f) => f.line);
   const text = 'Text("Hi").font(.system(size: 13))\n';
@@ -389,6 +418,17 @@ test("horizontal={false} is still a vertical list", () => {
   assert.deepStrictEqual(scanSource(src, "a.tsx").map((f) => f.rule), ["unvirtualized-list"]);
 });
 
+test("unvirtualized-list reads ScrollView props with tagEnd so arrows before horizontal stay quiet", () => {
+  const rulesFor = (src) => scanSource(src, "a.tsx").filter((f) => f.rule === "unvirtualized-list").map((f) => f.line);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} horizontal>{chips.map((c) => <Chip key={c} />)}</ScrollView>\n"), []);
+  assert.deepStrictEqual(rulesFor("<ScrollView style={{ padding: count > 0 ? 8 : 0 }} horizontal>{chips.map((c) => <Chip key={c} />)}</ScrollView>\n"), []);
+  assert.deepStrictEqual(rulesFor("<ScrollView stickyHeaderIndices={headers.map((_, i) => i)}><Text>Static</Text></ScrollView>\n"), []);
+  // Vertical ScrollViews with arrow props still flag, and a self-closing ScrollView does not swallow a later one.
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)}>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [1]);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} horizontal={false}>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [1]);
+  assert.deepStrictEqual(rulesFor("<ScrollView onScroll={(e) => log(e)} />\n<ScrollView>{items.map((i) => <Row key={i} />)}</ScrollView>\n"), [2]);
+});
+
 test("Android color resources reach template-theme", () => {
   const src = '<resources>\n  <color name="purple_500">#6200EE</color>\n</resources>\n';
   assert.deepStrictEqual(scanSource(src, "colors.xml").map((f) => f.rule), ["template-theme"]);
@@ -444,6 +484,21 @@ test("vague-button catches Swift, Compose and Flutter buttons", () => {
   // Specific labels stay quiet.
   assert.deepStrictEqual(scanSource('Button("Save address")', "a.swift"), []);
   assert.deepStrictEqual(scanSource('Text("Save address")', "a.kt"), []);
+});
+
+test("vague-button catches SwiftUI trailing-closure Button { ... } label: { ... }", () => {
+  const lines = (src) => scanSource(src, "a.swift").filter((f) => f.rule === "vague-button").map((f) => f.line);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  Text("Submit")\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  HStack { Image(systemName: "arrow.right"); Text("Click here") }\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button {\n  save()\n} label: {\n  Label("Tap here", systemImage: "hand.tap")\n}\n'), [1]);
+  assert.deepStrictEqual(lines('Button(role: .destructive) {\n  deleteAll()\n} label: {\n  Text("Submit")\n}\n'), [1]);
+  // Specific labels stay quiet even when the action closure mentions a vague word.
+  assert.deepStrictEqual(lines('Button {\n  analytics.track("Submit")\n  let unused = Text("Submit")\n} label: {\n  Text("Save address")\n}\n'), []);
+  assert.deepStrictEqual(lines('Button(role: .destructive) {\n  log("Submit")\n} label: {\n  Text("Delete account")\n}\n'), []);
+  // A type named Button without a trailing label closure is not a SwiftUI button call,
+  // and a lowercase helper like label("Submit") is not SwiftUI's Label view.
+  assert.deepStrictEqual(lines('struct Button {\n  let title = Text("Submit")\n}\n'), []);
+  assert.deepStrictEqual(lines('Button("Save") { label("Submit") }\n'), []);
 });
 
 test("vague-button reads the value of a submit or button input (issue #145)", () => {
@@ -1127,6 +1182,18 @@ test("nested-cards ignores dotted subcomponents and ion-card parts, still flags 
   assert.deepStrictEqual(rulesFor("<ion-card><ion-card></ion-card></ion-card>", "a.html"), ["nested-cards"]);
 });
 
+test("nested-cards reads opening tags with tagEnd so arrows or > in props do not misread sibling cards", () => {
+  const rulesFor = (src, file = "a.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()} />\n<Card><p>Second</p></Card>\n"), []);
+  assert.deepStrictEqual(rulesFor('<Card title="a > b" />\n<Card><p>Second</p></Card>\n'), []);
+  assert.deepStrictEqual(rulesFor("<Card disabled={count > 0} />\n<Card><p>Second</p></Card>\n"), []);
+  // Real nested cards with arrows or nested JSX in props still flag.
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()}>\n  <Card><p>Inner</p></Card>\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor("<Card onClick={() => open()}>\n  <Card />\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor("<Card header={<span />}>\n  <Card><p>Inner</p></Card>\n</Card>\n"), ["nested-cards"]);
+  assert.deepStrictEqual(rulesFor('<ion-card title="a > b"><ion-card></ion-card></ion-card>\n', "a.html"), ["nested-cards"]);
+});
+
 test("img-no-alt accepts Angular [alt] bindings and Svelte {alt} shorthand", () => {
   const rulesFor = (src, file) => scanSource(src, file).map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<img [src]="u.avatar" [alt]="u.name">\n', "a.component.html"), []);
@@ -1399,6 +1466,14 @@ test("hover-scale flags standalone CSS scale at 1.02 and above, not neutral, shr
   assert.deepStrictEqual(rulesFor(".card:hover { custom-scale: 1.1; }\n"), []);
 });
 
+test("hover-scale flags CSS transform translateY lift, but not zero or downward presses", () => {
+  const rulesFor = (src) => scanSource(src, "a.css", { kind: "web" }).map((f) => f.rule);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateY(-4px); }\n"), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateY(-0.5rem); }\n"), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor(".card:hover { transform: translateY(0); }\n"), []);
+  assert.deepStrictEqual(rulesFor(".button:hover { transform: translateY(1px); }\n"), []);
+});
+
 test("glow-shadow catches Android shadowColor on one line or with alpha", () => {
   const oneLine = '<TextView android:shadowColor="#7C3AED" android:shadowRadius="20" />';
   const multiLine = '<TextView\n    android:shadowColor="#807C3AED"\n    android:shadowRadius="20" />';
@@ -1470,6 +1545,23 @@ test("sparkle-icon scans nested Swift interpolation and raw strings", () => {
 
   const prose = "let label = #\"Use \"'sparkles'\" as text\"#";
   assert.deepStrictEqual(scanSource(prose, "a.swift"), []);
+});
+
+test("sparkle-icon flags Iconify and Nuxt sparkle icon names, not prose or unrelated icons", () => {
+  const vue = [
+    "<template>",
+    '  <Icon icon="lucide:sparkles" />',
+    '  <UIcon name="i-lucide-sparkles" />',
+    '  <Icon icon="mdi:sparkle" />',
+    '  <Icon icon="heroicons:sparkles" />',
+    '  <Icon icon="ph:sparkle" />',
+    '  <Icon icon="tabler:sparkles" />',
+    '  <p>Add some sparkles</p>',
+    '  <Icon icon="lucide:star" />',
+    "</template>",
+  ].join("\n");
+  const findings = scanSource(vue, "Badge.vue").filter((f) => f.rule === "sparkle-icon");
+  assert.deepStrictEqual(findings.map((f) => f.line), [2, 3, 4, 5, 6, 7]);
 });
 
 test("blankComments keeps slashes inside Swift raw strings and still finds later symbols", () => {
@@ -1687,4 +1779,24 @@ test("slop-gradient reads SwiftUI Color(red:green:blue:) stops (issue #162)", ()
     "Color(red: r, green: g, blue: b), Color(red: tint.r, green: 0.23, blue: 0.93)",
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});
+
+test("glow-shadow checks each box-shadow layer independently so a neutral layer does not hide a colored glow", () => {
+  const rulesFor = (src, file = "a.css") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.rule);
+  const flagged = [
+    [".card { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 24px rgba(124, 58, 237, 0.5); }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px #000, 0 0 20px #7c3aed; }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px black, 0 0 20px purple; }\n", "a.css"],
+    [".card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 28px rgb(139 92 246 / 0.5); }\n", "a.css"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_40px_#7c3aed]">x</div>\n', "a.tsx"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_40px_rgba(124,58,237,0.5)]">x</div>\n', "a.tsx"],
+  ];
+  for (const [src, file] of flagged) assert.deepStrictEqual(rulesFor(src, file), ["glow-shadow"], src);
+  const quiet = [
+    [".card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1); }\n", "a.css"],
+    [".card { box-shadow: inset 2px 0 0 #e0763f, 0 1px 2px rgba(0, 0, 0, 0.2); }\n", "a.css"],
+    [".card { box-shadow: 0 1px 2px black, 0 4px 12px #00000040; }\n", "a.css"],
+    ['<div className="shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_8px_rgba(128,128,128,0.3)]">x</div>\n', "a.tsx"],
+  ];
+  for (const [src, file] of quiet) assert.deepStrictEqual(rulesFor(src, file), [], src);
 });
