@@ -1718,6 +1718,16 @@ test("drawer-nav catches every style of the hamburger icon (issue #146)", () => 
   assert.deepStrictEqual(lines('<Ionicons name="menu-sharp-outline" />\n', "Header.tsx"), []);
 });
 
+test("drawer-nav catches Heroicons Bars3Icon and Tabler IconMenu2 (issue #204)", () => {
+  const lines = (src, file) => scanSource(src, file).filter((f) => f.rule === "drawer-nav").map((f) => f.line);
+  assert.deepStrictEqual(lines('<Bars3Icon size={24} />\n', "Header.tsx"), [1]);
+  assert.deepStrictEqual(lines('<Bars3BottomLeftIcon size={24} />\n', "Header.tsx"), [1]);
+  assert.deepStrictEqual(lines('<IconMenu2 size={24} />\n', "Header.tsx"), [1]);
+  // Dropdown Menu component and overflow EllipsisVerticalIcon stay quiet.
+  assert.deepStrictEqual(lines('import Menu from "@mui/material/Menu";\n<Menu open={false} />\n', "Header.tsx"), []);
+  assert.deepStrictEqual(lines('<EllipsisVerticalIcon size={24} />\n', "Header.tsx"), []);
+});
+
 test("clickable-div flags Angular (click) and Alpine x-on:click handlers", () => {
   const rulesFor = (src) => scanSource(src, "a.html").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<div class="card" (click)="open()">Details</div>\n'), ["clickable-div"]);
