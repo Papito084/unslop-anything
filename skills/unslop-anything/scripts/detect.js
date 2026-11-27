@@ -1453,7 +1453,7 @@ const rules = [
         const tag = code.slice(m.index, end === -1 ? undefined : end);
         if (tag.startsWith("<Image") && !/\ssrc\s*=/.test(tag)) continue;
         const hasAlt = /[\s:\[.]alt\]?\s*=|\{\s*alt\s*\}|\{\s*\.\.\./.test(tag)
-          || (stack === "web" && /\salt(?=[\s/>]|$)/.test(tag));
+          || (stack === "web" && /\salt(?=[\s/>]|$)/.test(tag.replace(/"[^"]*"|'[^']*'/g, "")));
         if (!hasAlt) hits.push(m.index);
       }
       return hits;
