@@ -2135,6 +2135,51 @@ test("slop-gradient reads Compose Color(red = ..., green = ..., blue = ...) stop
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
 
+test('hover-scale flags "&:hover" and ":hover" in JS style objects (issue #236)', () => {
+  const rulesFor = (src, file = "Feature.tsx") =>
+    scanSource(src, file, { kind: "web" })
+      .filter((f) => f.rule === "hover-scale")
+      .map((f) => f.rule);
+
+  const repro = [
+    'import Card from "@mui/material/Card";',
+    "",
+    "export function Feature() {",
+    "  return (",
+    '    <Card sx={{ "&:hover": { transform: "scale(1.05)" } }}>',
+    "      Fast",
+    "    </Card>",
+    "  );",
+    "}",
+    "",
+    "export function Lift() {",
+    '  return <Card sx={{ "&:hover": { transform: "translateY(-4px)" } }}>Lift</Card>;',
+    "}",
+  ].join("\n");
+
+  assert.deepStrictEqual(
+    scanSource(repro, "Feature.tsx", { kind: "web" })
+      .filter((f) => f.rule === "hover-scale")
+      .map((f) => [f.rule, f.line]),
+    [["hover-scale", 5], ["hover-scale", 12]]
+  );
+
+  // Quoted '&:hover', ":hover", ':hover' variants
+  assert.deepStrictEqual(rulesFor('<div sx={{ \'&:hover\': { transform: "scale(1.05)" } }} />\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<div sx={{ ":hover": { transform: "scale(1.05)" } }} />\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<div sx={{ \':hover\': { transform: "scale(1.05)" } }} />\n'), ["hover-scale"]);
+
+  // translate() lift variants
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translate(0, -4px)" } }} />\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translate3d(0, -4px, 0)" } }} />\n'), ["hover-scale"]);
+
+  // Quiet cases
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "scale(1.01)" } }} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:active": { transform: "scale(0.98)" } }} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translateY(2px)" } }} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { backgroundColor: "#eee" } }} />\n'), []);
+});
+
 test("glow-shadow flags Flutter text Shadow(color: ...), not neutral ones (issue #230)", () => {
   const glowLines = (src, file = "title.dart") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.line);
   // Issue #230 repro:
