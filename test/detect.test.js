@@ -2190,6 +2190,31 @@ test("drawer-nav catches React Native Paper's icon=\"menu\" (issue #226)", () =>
   assert.deepStrictEqual(lines('<Appbar.Action icon="dots-vertical" />\n'), []);
 });
 
+test("drawer-nav catches Ionic's IonMenuToggle (issue #265)", () => {
+  const lines = (src, file = "Header.tsx") => scanSource(src, file, { platform: "mobile" }).filter((f) => f.rule === "drawer-nav").map((f) => [f.line, f.severity]);
+  // Issue #265 repro:
+  const repro = [
+    'import { IonMenuToggle, IonButton } from "@ionic/react";',
+    "",
+    "export function Header() {",
+    "  return (",
+    "    <IonMenuToggle>",
+    "      <IonButton>Menu</IonButton>",
+    "    </IonMenuToggle>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [[5, "noticeable"]]);
+
+  // Tag variants
+  for (const tag of ["IonMenu", "IonMenuButton", "IonMenuToggle", "ion-menu", "ion-menu-button", "ion-menu-toggle"]) {
+    assert.deepStrictEqual(lines(`<${tag} />\n`), [[1, "noticeable"]], tag);
+  }
+
+  // Quiet cases: IonTabs and IonTabBar
+  assert.deepStrictEqual(lines("<IonTabs>\n  <IonTabBar slot=\"bottom\" />\n</IonTabs>\n"), []);
+});
+
 test("keyboard-cover flags a bare TextInput on a screen file, not in a reusable input", () => {
   const rulesFor = (src, file) => scanSource(src, file).filter((f) => f.rule === "keyboard-cover").map((f) => f.line);
   const bare = 'import { TextInput, View } from "react-native";\n\nexport default function Login() {\n  return (\n    <View>\n      <TextInput placeholder="Email" />\n    </View>\n  );\n}\n';
