@@ -1692,6 +1692,30 @@ test("hover-scale flags Tailwind arbitrary scale values of 1.02 and above", () =
   assert.deepStrictEqual(rulesFor('<div className="hover:scale-105">x</div>\n'), ["hover-scale"]);
 });
 
+test("hover-scale flags Tailwind translate-y lifts written in px and arbitrary values (issue #246)", () => {
+  const lines = (src) => scanSource(src, "Feature.tsx").filter((f) => f.rule === "hover-scale").map((f) => f.line);
+  const repro = [
+    "export function Feature() {",
+    "  return (",
+    '    <div className="rounded-xl border p-6 transition hover:-translate-y-[2px]">',
+    "      Fast",
+    "    </div>",
+    "  );",
+    "}",
+    "",
+    'export const Lift = () => <div className="hover:-translate-y-px">Lift</div>;',
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [3, 9]);
+  for (const cls of ["hover:-translate-y-px", "hover:-translate-y-[2px]", "hover:translate-y-[-2px]", "group-hover:-translate-y-px", "group-hover:-translate-y-[2px]", "group-hover:translate-y-[-2px]"]) {
+    assert.deepStrictEqual(lines(`<div className="${cls}">x</div>\n`), [1], cls);
+  }
+  // Downward and sideways moves stay quiet, and the numeric step still works.
+  for (const cls of ["hover:translate-y-px", "hover:translate-y-[2px]", "hover:-translate-x-1", "hover:-translate-x-[2px]"]) {
+    assert.deepStrictEqual(lines(`<div className="${cls}">x</div>\n`), [], cls);
+  }
+  assert.deepStrictEqual(lines('<div className="hover:-translate-y-1">x</div>\n'), [1]);
+});
+
 test("hover-scale flags standalone CSS scale at 1.02 and above, not neutral, shrinking, or similarly named properties", () => {
   const rulesFor = (src) => scanSource(src, "a.css", { kind: "web" }).map((f) => f.rule);
   assert.deepStrictEqual(rulesFor(".card:hover { scale: 1.02; }\n"), ["hover-scale"]);
