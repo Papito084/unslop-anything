@@ -1473,6 +1473,8 @@ test("img-no-alt ignores the word alt inside other attribute values (issue #262)
   // A real alt alongside class="card alt wide" stays quiet
   assert.deepStrictEqual(rulesFor('<img src="/hero.png" class="card alt wide" alt="Hero" />\n', "Gallery.html"), []);
   assert.deepStrictEqual(rulesFor('<img src="/hero.png" alt class="card alt wide" />\n', "Gallery.html"), []);
+  assert.deepStrictEqual(rulesFor('<img src="/hero.png" class = "card alt wide" />\n', "Gallery.html"), ["img-no-alt"]);
+  assert.deepStrictEqual(rulesFor("<img src={src} title={`Bob's photo`} alt class='thumb' />\n", "Thumb.svelte"), []);
 });
 
 test("img-no-alt flags Nuxt Image's NuxtImg and NuxtPicture without alt, also kebab-case", () => {
