@@ -1642,6 +1642,21 @@ test("glow-shadow catches Tailwind colored and arbitrary shadows while ignoring 
   assert.deepStrictEqual(scanSource(neutral, "a.tsx"), []);
 });
 
+test("glow-shadow catches Tailwind sky shadows (issue #269)", () => {
+  // Issue #269 repro:
+  const repro = '<div className="rounded-xl shadow-lg shadow-sky-500/50">Pro</div>;\n';
+  assert.deepStrictEqual(scanSource(repro, "Card.tsx").map((f) => [f.line, f.severity, f.rule]), [[1, "minor", "glow-shadow"]]);
+
+  // Flagged forms: without opacity, hover variant
+  assert.deepStrictEqual(scanSource('<div className="shadow-sky-400">x</div>\n', "Card.tsx").map((f) => f.rule), ["glow-shadow"]);
+  assert.deepStrictEqual(scanSource('<div className="hover:shadow-sky-500">x</div>\n', "Card.tsx").map((f) => f.rule), ["glow-shadow"]);
+
+  // Neutral shadows stay quiet
+  assert.deepStrictEqual(scanSource('<div className="shadow-slate-500/20">x</div>\n', "Card.tsx"), []);
+  assert.deepStrictEqual(scanSource('<div className="shadow-gray-900/10">x</div>\n', "Card.tsx"), []);
+  assert.deepStrictEqual(scanSource('<div className="shadow-black/5">x</div>\n', "Card.tsx"), []);
+});
+
 test("glow-shadow skips inset accent bars with no blur (#111)", () => {
   const bars = [
     ".line.highlighted {",
