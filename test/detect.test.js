@@ -2199,6 +2199,45 @@ test("clickable-div flags click handlers on article and section (issue #231)", (
   assert.deepStrictEqual(rulesFor('<section onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</section>\n'), []);
 });
 
+test("clickable-div flags click handlers on headings and paragraphs (issue #264)", () => {
+  const rulesFor = (src, file = "a.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.rule);
+  const linesFor = (src, file = "a.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.line);
+
+  // Issue #264 repro:
+  const repro = [
+    "export function Faq({ toggle }) {",
+    "  return <h3 onClick={toggle}>Shipping</h3>;",
+    "}",
+    "export const Note = ({ open }) => <p onClick={open}>Read more</p>;",
+  ].join("\n");
+  assert.deepStrictEqual(linesFor(repro, "Faq.tsx"), [2, 4]);
+
+  // Flagged forms: h1-h6 and p with various frameworks' click handlers
+  for (const tag of ["h1", "h2", "h3", "h4", "h5", "h6", "p"]) {
+    assert.deepStrictEqual(rulesFor(`<${tag} onClick={toggle}>Title</${tag}>\n`), ["clickable-div"]);
+  }
+  assert.deepStrictEqual(rulesFor('<h2 @click="toggle">Title</h2>\n', "Faq.vue"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<p (click)="toggle()">More</p>\n', "Faq.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<h4 on:click={toggle}>Title</h4>\n', "Faq.svelte"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<p onclick="toggle()">More</p>\n', "Faq.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<h1 onClick$={toggle}>Title</h1>\n'), ["clickable-div"]);
+
+  // Quiet cases: PrimeNG p-button, path, picture, interactive role + tabIndex, and heading/paragraph without click
+  assert.deepStrictEqual(rulesFor('<p-button (click)="save()"></p-button>\n', "Faq.html"), []);
+  assert.deepStrictEqual(rulesFor('<path onClick={save} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<picture onClick={save}><img src="x" alt="x" /></picture>\n'), []);
+  assert.deepStrictEqual(rulesFor('<h3 onClick={toggle} role="button" tabIndex={0}>Shipping</h3>\n'), []);
+  assert.deepStrictEqual(rulesFor('<p onClick={open} role="button" tabIndex={0}>Read more</p>\n'), []);
+  assert.deepStrictEqual(rulesFor('<h3>Shipping</h3>\n'), []);
+  assert.deepStrictEqual(rulesFor('<p>Read more</p>\n'), []);
+});
+
 test("template-theme flags create-vite's #646cff and #535bf2", () => {
   const rulesFor = (src) => scanSource(src, "index.css").map((f) => f.rule).filter((r) => r === "template-theme");
   assert.deepStrictEqual(rulesFor("a {\n  font-weight: 500;\n  color: #646cff;\n}\na:hover {\n  color: #535bf2;\n}\n"), ["template-theme"]);
