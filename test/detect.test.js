@@ -1844,12 +1844,15 @@ test("sparkle-icon flags Iconify and Nuxt sparkle icon names, not prose or unrel
     '  <Icon icon="heroicons:sparkles" />',
     '  <Icon icon="ph:sparkle" />',
     '  <Icon icon="tabler:sparkles" />',
+    '  <i class="ri-sparkling-line"></i>',
+    '  <i class="ri-sparkling-2-fill"></i>',
     '  <p>Add some sparkles</p>',
+    '  <span>sparkling water</span>',
     '  <Icon icon="lucide:star" />',
     "</template>",
   ].join("\n");
   const findings = scanSource(vue, "Badge.vue").filter((f) => f.rule === "sparkle-icon");
-  assert.deepStrictEqual(findings.map((f) => f.line), [2, 3, 4, 5, 6, 7]);
+  assert.deepStrictEqual(findings.map((f) => f.line), [2, 3, 4, 5, 6, 7, 8, 9]);
 });
 
 test("sparkle-icon flags react-icons sparkle names, not unrelated icons", () => {
@@ -1857,7 +1860,7 @@ test("sparkle-icon flags react-icons sparkle names, not unrelated icons", () => 
   // Issue #197: the repro.
   const repro = 'import { HiSparkles } from "react-icons/hi2";\nimport { MdAutoAwesome } from "react-icons/md";\n\nexport function AiBadge() {\n  return <HiSparkles />;\n}\n';
   assert.deepStrictEqual(sparkleLines(repro), [1, 2, 5]);
-  for (const name of ["HiSparkles", "HiOutlineSparkles", "LuSparkles", "TbSparkles", "PiSparkle", "IoSparklesSharp", "IoSparklesOutline", "MdAutoAwesome", "MdOutlineAutoAwesome"]) {
+  for (const name of ["HiSparkles", "HiOutlineSparkles", "LuSparkles", "TbSparkles", "PiSparkle", "IoSparklesSharp", "IoSparklesOutline", "MdAutoAwesome", "MdOutlineAutoAwesome", "RiSparklingLine", "RiSparklingFill", "RiSparkling2Line", "RiSparkling2Fill"]) {
     assert.deepStrictEqual(sparkleLines(`<${name} />\n`), [1], name);
   }
   for (const name of ["HiStar", "MdAutoGraph", "SparkleCounter"]) {
