@@ -1452,6 +1452,32 @@ test("img-no-alt flags Quasar's q-img and Element Plus's el-image without alt", 
   assert.deepStrictEqual(altLines('<el-image-viewer src="/hero.png" />\n'), []);
 });
 
+test("img-no-alt flags Astro's Picture component without alt (issue #268)", () => {
+  const altLines = (src, file = "Hero.astro") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "img-no-alt").map((f) => f.line);
+  // Issue #268 repro:
+  const repro = [
+    "---",
+    'import { Picture } from "astro:assets";',
+    'import hero from "../hero.png";',
+    "---",
+    '<Picture src={hero} formats={["avif", "webp"]} />',
+  ].join("\n");
+  assert.deepStrictEqual(altLines(repro), [5]);
+
+  // Alt forms stay quiet
+  assert.deepStrictEqual(altLines('<Picture src={hero} alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(altLines('<Picture src={hero} alt="" />\n'), []);
+  assert.deepStrictEqual(altLines('<Picture src={hero} alt={caption} />\n'), []);
+  assert.deepStrictEqual(altLines('<Picture src={hero} {...props} />\n'), []);
+
+  // HTML <picture> is lowercase and handled by its child <img>
+  assert.deepStrictEqual(altLines('<picture><img src="/hero.png" alt="Hero" /></picture>\n'), []);
+
+  // Missing src or unrelated component starting with Picture stays quiet
+  assert.deepStrictEqual(altLines('<Picture formats={["avif"]} />\n'), []);
+  assert.deepStrictEqual(altLines('<PictureFrame items={items} />\n'), []);
+});
+
 test("placeholder-label flags inputs that use a placeholder as their only label", () => {
   const rulesFor = (src) => scanSource(src, "a.tsx").map((f) => f.rule);
   // The issue's repro.

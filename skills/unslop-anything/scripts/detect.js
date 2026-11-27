@@ -1448,10 +1448,11 @@ const rules = [
       // Vuetify renders <v-img> / <VImg> as an <img> too (#229).
       // Ionic renders <ion-img> / <IonImg> as an <img> too (#235).
       // Quasar renders <q-img> / <QImg> and Element Plus <el-image> / <ElImage> as <img> too (#249).
-      for (const m of matches(/<(?:img|Image|NuxtImg|NuxtPicture|nuxt-img|nuxt-picture|v-img|VImg|ion-img|IonImg|q-img|QImg|el-image|ElImage)(?=[\s/>])/, code)) {
+      // Astro renders <Picture> as an <img> too (#268).
+      for (const m of matches(/<(?:img|Image|Picture|NuxtImg|NuxtPicture|nuxt-img|nuxt-picture|v-img|VImg|ion-img|IonImg|q-img|QImg|el-image|ElImage)(?=[\s/>])/, code)) {
         const end = tagEnd(code, m.index);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
-        if (tag.startsWith("<Image") && !/\ssrc\s*=/.test(tag)) continue;
+        if ((tag.startsWith("<Image") || tag.startsWith("<Picture")) && !/\ssrc\s*=/.test(tag)) continue;
         const hasAlt = /[\s:\[.]alt\]?\s*=|\{\s*alt\s*\}|\{\s*\.\.\./.test(tag)
           || (stack === "web" && /\salt(?=[\s/>]|$)/.test(tag));
         if (!hasAlt) hits.push(m.index);
