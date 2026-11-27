@@ -2131,6 +2131,31 @@ test("drawer-nav catches React Native Paper's icon=\"menu\" (issue #226)", () =>
   assert.deepStrictEqual(lines('<Appbar.Action icon="dots-vertical" />\n'), []);
 });
 
+test("drawer-nav catches Ionic's IonMenuToggle (issue #265)", () => {
+  const lines = (src, file = "Header.tsx") => scanSource(src, file, { platform: "mobile" }).filter((f) => f.rule === "drawer-nav").map((f) => [f.line, f.severity]);
+  // Issue #265 repro:
+  const repro = [
+    'import { IonMenuToggle, IonButton } from "@ionic/react";',
+    "",
+    "export function Header() {",
+    "  return (",
+    "    <IonMenuToggle>",
+    "      <IonButton>Menu</IonButton>",
+    "    </IonMenuToggle>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [[5, "noticeable"]]);
+
+  // Tag variants
+  for (const tag of ["IonMenu", "IonMenuButton", "IonMenuToggle", "ion-menu", "ion-menu-button", "ion-menu-toggle"]) {
+    assert.deepStrictEqual(lines(`<${tag} />\n`), [[1, "noticeable"]], tag);
+  }
+
+  // Quiet cases: IonTabs and IonTabBar
+  assert.deepStrictEqual(lines("<IonTabs>\n  <IonTabBar slot=\"bottom\" />\n</IonTabs>\n"), []);
+});
+
 test("clickable-div flags Angular (click) and Alpine x-on:click handlers", () => {
   const rulesFor = (src) => scanSource(src, "a.html").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<div class="card" (click)="open()">Details</div>\n'), ["clickable-div"]);
