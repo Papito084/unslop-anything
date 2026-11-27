@@ -1789,12 +1789,12 @@ test("sparkle-icon flags MUI AutoAwesomeIcon and styled variants (issue #227)", 
   ].join("\n");
   assert.deepStrictEqual(sparkleLines(repro), [1, 2, 5]);
 
-  for (const name of ["AutoAwesomeIcon", "AutoAwesomeOutlined", "AutoAwesomeRounded", "AutoAwesomeSharp", "AutoAwesomeTwoTone"]) {
+  for (const name of ["AutoAwesomeIcon", "AutoAwesomeOutlined", "AutoAwesomeRounded", "AutoAwesomeSharp", "AutoAwesomeTwoTone", "AutoAwesomeOutlinedIcon", "AutoAwesomeTwoToneIcon"]) {
     assert.deepStrictEqual(sparkleLines(`<${name} />\n`), [1], name);
   }
 
   // Unrelated AutoAwesomeMosaic and AutoAwesomeMotion stay quiet
-  for (const name of ["AutoAwesomeMosaic", "AutoAwesomeMotion", "AutoAwesomeMosaicOutlined", "AutoAwesomeMotionRounded"]) {
+  for (const name of ["AutoAwesomeMosaic", "AutoAwesomeMotion", "AutoAwesomeMosaicOutlined", "AutoAwesomeMotionRounded", "AutoAwesomeMosaicIcon", "AutoAwesomeMotionOutlinedIcon"]) {
     assert.deepStrictEqual(sparkleLines(`<${name} />\n`), [], name);
   }
 });
