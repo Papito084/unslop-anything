@@ -1308,6 +1308,32 @@ test("focus-removed flags outline-style: none and outlineStyle: \"none\" (issue 
   assert.deepStrictEqual(lines("input:focus { outline-style: none; } input:focus-visible { outline: 2px solid blue; }\n", "field.css"), []);
 });
 
+test("nested-cards flags PascalCase kit cards like IonCard, VCard, QCard and ElCard (issue #245)", () => {
+  const lines = (src, file = "Plans.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.line);
+  const repro = [
+    'import { IonCard, IonCardContent } from "@ionic/react";',
+    "",
+    "export function Plans() {",
+    "  return (",
+    "    <IonCard>",
+    "      <IonCard>",
+    "        <IonCardContent>Pro plan</IonCardContent>",
+    "      </IonCard>",
+    "    </IonCard>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [5]);
+  for (const tag of ["VCard", "QCard", "ElCard"]) {
+    assert.deepStrictEqual(lines(`<template>\n  <${tag}>\n    <${tag}>Pro plan</${tag}>\n  </${tag}>\n</template>\n`, "Plans.vue"), [2], tag);
+  }
+  // Card parts inside one card stay quiet.
+  assert.deepStrictEqual(lines("<IonCard>\n  <IonCardHeader>Pro</IonCardHeader>\n  <IonCardContent>Plan</IonCardContent>\n</IonCard>\n"), []);
+  assert.deepStrictEqual(lines("<template>\n  <VCard>\n    <VCardText>Pro</VCardText>\n  </VCard>\n</template>\n", "Plans.vue"), []);
+  assert.deepStrictEqual(lines("<template>\n  <QCard>\n    <QCardSection>Pro</QCardSection>\n  </QCard>\n</template>\n", "Plans.vue"), []);
+  assert.deepStrictEqual(lines("<template>\n  <ElCard>\n    <ElCardBody>Pro</ElCardBody>\n  </ElCard>\n</template>\n", "Plans.vue"), []);
+});
+
 test("nested-cards ignores dotted subcomponents and ion-card parts, still flags a real nested card", () => {
   const rulesFor = (src, file = "a.tsx") => scanSource(src, file).map((f) => f.rule);
   // Issue #65: dotted subcomponents of a single card are not nested cards.
