@@ -1044,7 +1044,7 @@ const rules = [
       // when the literal is exactly that symbol; substrings and apostrophes
       // inside longer text stay quiet.
       const symbol = /^(?:sparkles?(?:\.[a-z0-9._-]+)?|wand\.and\.(?:stars|sparkles)(?:\.[a-z0-9._-]+)?|[a-z0-9-]+:sparkles?|i-[a-z0-9-]+-sparkles?|wand-magic-sparkles)$/;
-      const re = /\bauto_awesome\b|\bAutoAwesome(?:Outlined|Rounded|Sharp|TwoTone)?(?:Icon)?\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bIconSparkles\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨|\b(?:Hi(?:Outline|Mini)?|Lu|Tb|Pi|Bs|Io|Ri)Sparkles?(?:Fill|Line|Outline|Sharp|Bold|Duotone|Light|Thin)?\b|\bRiSparkling(?:2)?(?:Fill|Line)?\b|\bMd(?:Outline|Round|Sharp|TwoTone)?AutoAwesome\b|\bfaWandMagicSparkles\b|(?<![\w-])fa-wand-magic-sparkles(?![\w-])|(?<![\w-])ri-sparkling(?:-2)?-(?:line|fill)(?![\w-])/;
+      const re = /\bauto_awesome\b|\bAutoAwesome(?:Outlined|Rounded|Sharp|TwoTone)?(?:Icon)?\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bIconSparkles\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨|\b(?:Hi(?:Outline|Mini)?|Lu|Tb|Pi|Bs|Io|Ri)Sparkles?(?:Fill|Line|Outline|Sharp|Bold|Duotone|Light|Thin)?\b|\bRiSparkling(?:2)?(?:Fill|Line)?\b|\bMd(?:Outline|Round|Sharp|TwoTone)?AutoAwesome\b|\bfa(?:WandMagic)?Sparkles\b|(?<![\w-])fa-(?:wand-magic-)?sparkles(?![\w-])|(?<![\w-])ri-sparkling(?:-2)?-(?:line|fill)(?![\w-])/;
       const hits = [...matches(re, code)].map((m) => m.index);
 
       for (const literal of stringLiterals(code, stack)) {
@@ -1200,10 +1200,13 @@ const rules = [
     stacks: ["js"],
     message: "Screen with a text input and no keyboard handling. The keyboard may cover the field.",
     fix: "Use KeyboardAvoidingView, automaticallyAdjustKeyboardInsets, or the project's keyboard library, and set keyboardShouldPersistTaps on the scroll view. Check it on a small phone.",
-    find({ code }) {
+    find({ code, file }) {
       const input = /<TextInput\b/.exec(code);
       if (!input) return [];
-      if (!/<(?:ScrollView|FlatList|FlashList|SafeAreaView|KeyboardAwareScrollView)\b/.test(code)) return [];
+      const where = file.replace(/\\/g, "/");
+      const name = path.basename(where).replace(/\.[^.]+$/, "");
+      const screenPath = /(?:^|\/)screens\//.test(where) || /Screen$/.test(name) || (/(?:^|\/)app\//.test(where) && !name.startsWith("_"));
+      if (!screenPath && !/<(?:ScrollView|FlatList|FlashList|SafeAreaView|KeyboardAwareScrollView)\b/.test(code)) return [];
       if (/KeyboardAvoidingView|KeyboardAware|KeyboardProvider|KeyboardStickyView|KeyboardController|automaticallyAdjustKeyboardInsets|keyboardShouldPersistTaps/.test(code)) return [];
       return [input.index];
     },
@@ -1431,6 +1434,9 @@ const rules = [
         // The longhand: `outline-style: none` in CSS and `outlineStyle: "none"`
         // in a JS style object (#250) remove the focus outline just the same.
         for (const m of matches(/outline-style\s*:\s*["']?none\b["']?|outlineStyle\s*:\s*["']?none\b["']?/, code)) hits.push(m.index);
+        // Setting the width to zero (`outline-width: 0` in CSS, `outlineWidth: 0`
+        // in a JS style object, #263) hides the focus ring just the same.
+        for (const m of matches(/(?:outline-width|outlineWidth)\s*:\s*["']?0(?:px)?(?![.\d])\b["']?/, code)) hits.push(m.index);
       }
       return hits;
     },
