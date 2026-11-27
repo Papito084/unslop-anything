@@ -1377,7 +1377,7 @@ const rules = [
     family: "accessibility",
     severity: "noticeable",
     stacks: ["js", "web"],
-    message: "Click handler on a div or span. Keyboard and screen reader users cannot reach it.",
+    message: "Click handler on a non-interactive element such as a div, span or article. Keyboard and screen reader users cannot reach it.",
     fix: "Use a <button> for actions and an <a href> for navigation. They come with focus, Enter and Space, and the right role.",
     find({ code }) {
       const hits = [];
