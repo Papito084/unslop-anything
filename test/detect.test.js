@@ -2134,3 +2134,29 @@ test("slop-gradient reads Compose Color(red = ..., green = ..., blue = ...) stop
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
 });
+
+test("glow-shadow flags Flutter text Shadow(color: ...), not neutral ones (issue #230)", () => {
+  const glowLines = (src, file = "title.dart") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.line);
+  // Issue #230 repro:
+  const repro = [
+    "import 'package:flutter/material.dart';",
+    "",
+    "const title = Text(",
+    "  'Pro',",
+    "  style: TextStyle(",
+    "    shadows: [Shadow(color: Colors.purple, blurRadius: 20)],",
+    "  ),",
+    ");",
+  ].join("\n");
+  assert.deepStrictEqual(glowLines(repro, "title.dart"), [6]);
+
+  // Colored Shadow and BoxShadow
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Colors.purple, blurRadius: 20);\n"), [1]);
+  assert.deepStrictEqual(glowLines("const s = BoxShadow(color: Colors.purple, blurRadius: 20);\n"), [1]);
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Color(0xFF7C3AED), blurRadius: 16);\n"), [1]);
+
+  // Neutral cases stay quiet
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Colors.black26, blurRadius: 4);\n"), []);
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Color(0x42000000));\n"), []);
+  assert.deepStrictEqual(glowLines("const s = BoxShadow(color: Colors.black54, blurRadius: 4);\n"), []);
+});
