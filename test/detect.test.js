@@ -1308,6 +1308,28 @@ test("focus-removed flags outline-style: none and outlineStyle: \"none\" (issue 
   assert.deepStrictEqual(lines("input:focus { outline-style: none; } input:focus-visible { outline: 2px solid blue; }\n", "field.css"), []);
 });
 
+test("focus-removed flags outline-width: 0 and outlineWidth: 0 (issue #263)", () => {
+  const lines = (src, file = "Field.tsx") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "focus-removed").map((f) => f.line);
+  // Issue #263 repro:
+  assert.deepStrictEqual(lines('export const Field = () => <input style={{ outlineWidth: 0 }} aria-label="Email" />;\n'), [1]);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0; }\n", "field.css"), [1]);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0px; }\n", "field.css"), [1]);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: "0" }} />\n'), [1]);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: "0px" }} />\n'), [1]);
+  assert.deepStrictEqual(lines("<input style={{ outlineWidth: '0' }} />\n"), [1]);
+  // The quiet cases: a real outline width, and a file with a focus-visible style.
+  assert.deepStrictEqual(lines("input:focus { outline-width: 2px; }\n", "field.css"), []);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: 2 }} />\n'), []);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: "2px" }} />\n'), []);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0.5px; }\n", "field.css"), []);
+  assert.deepStrictEqual(
+    lines('export const Field = () => <input style={{ outlineWidth: 0 }} />;\n:focus-visible { outline: 2px solid blue; }\n'),
+    [],
+  );
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: 0 }} className="focus-visible:ring-2" />\n'), []);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0; } input:focus-visible { outline: 2px solid blue; }\n", "field.css"), []);
+});
+
 test("nested-cards flags PascalCase kit cards like IonCard, VCard, QCard and ElCard (issue #245)", () => {
   const lines = (src, file = "Plans.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.line);
   const repro = [
@@ -1476,6 +1498,32 @@ test("img-no-alt flags Quasar's q-img and Element Plus's el-image without alt", 
   assert.deepStrictEqual(altLines('<q-img :src="photo.url" :alt="photo.caption" />\n'), []);
   assert.deepStrictEqual(altLines('<el-image :src="photo.url" :alt="photo.caption" />\n'), []);
   assert.deepStrictEqual(altLines('<el-image-viewer src="/hero.png" />\n'), []);
+});
+
+test("img-no-alt flags Astro's Picture component without alt (issue #268)", () => {
+  const altLines = (src, file = "Hero.astro") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "img-no-alt").map((f) => f.line);
+  // Issue #268 repro:
+  const repro = [
+    "---",
+    'import { Picture } from "astro:assets";',
+    'import hero from "../hero.png";',
+    "---",
+    '<Picture src={hero} formats={["avif", "webp"]} />',
+  ].join("\n");
+  assert.deepStrictEqual(altLines(repro), [5]);
+
+  // Alt forms stay quiet
+  assert.deepStrictEqual(altLines('<Picture src={hero} alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(altLines('<Picture src={hero} alt="" />\n'), []);
+  assert.deepStrictEqual(altLines('<Picture src={hero} alt={caption} />\n'), []);
+  assert.deepStrictEqual(altLines('<Picture src={hero} {...props} />\n'), []);
+
+  // HTML <picture> is lowercase and handled by its child <img>
+  assert.deepStrictEqual(altLines('<picture><img src="/hero.png" alt="Hero" /></picture>\n'), []);
+
+  // Missing src or unrelated component starting with Picture stays quiet
+  assert.deepStrictEqual(altLines('<Picture formats={["avif"]} />\n'), []);
+  assert.deepStrictEqual(altLines('<PictureFrame items={items} />\n'), []);
 });
 
 test("placeholder-label flags inputs that use a placeholder as their only label", () => {
@@ -2008,6 +2056,17 @@ test("sparkle-icon flags Font Awesome's wand-magic-sparkles, not the plain wand"
   assert.deepStrictEqual(sparkleLines('<FontAwesomeIcon icon="wand-magic" />\n'), []);
 });
 
+test("sparkle-icon flags Font Awesome's faSparkles and fa-sparkles (issue #267)", () => {
+  const sparkleLines = (src) => scanSource(src, "Ai.tsx").filter((f) => f.rule === "sparkle-icon").map((f) => f.line);
+  assert.deepStrictEqual(sparkleLines('import { faSparkles } from "@fortawesome/pro-solid-svg-icons";\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-sparkles" />\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('<i class="fa-sparkles text-lg"></i>\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('import { faStar } from "@fortawesome/free-solid-svg-icons";\n'), []);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-star" />\n'), []);
+  assert.deepStrictEqual(sparkleLines('const copy = "magic sparkles in the sky";\n'), []);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-wand-magic-sparkles" />\n'), [1]);
+});
+
 test("blankComments keeps slashes inside Swift raw strings and still finds later symbols", () => {
   const src = [
     'let label = #"A "// B"#',
@@ -2157,6 +2216,49 @@ test("drawer-nav catches React Native Paper's icon=\"menu\" (issue #226)", () =>
   assert.deepStrictEqual(lines('<Appbar.Action icon="dots-vertical" />\n'), []);
 });
 
+test("drawer-nav catches Ionic's IonMenuToggle (issue #265)", () => {
+  const lines = (src, file = "Header.tsx") => scanSource(src, file, { platform: "mobile" }).filter((f) => f.rule === "drawer-nav").map((f) => [f.line, f.severity]);
+  // Issue #265 repro:
+  const repro = [
+    'import { IonMenuToggle, IonButton } from "@ionic/react";',
+    "",
+    "export function Header() {",
+    "  return (",
+    "    <IonMenuToggle>",
+    "      <IonButton>Menu</IonButton>",
+    "    </IonMenuToggle>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [[5, "noticeable"]]);
+
+  // Tag variants
+  for (const tag of ["IonMenu", "IonMenuButton", "IonMenuToggle", "ion-menu", "ion-menu-button", "ion-menu-toggle"]) {
+    assert.deepStrictEqual(lines(`<${tag} />\n`), [[1, "noticeable"]], tag);
+  }
+
+  // Quiet cases: IonTabs and IonTabBar
+  assert.deepStrictEqual(lines("<IonTabs>\n  <IonTabBar slot=\"bottom\" />\n</IonTabs>\n"), []);
+});
+
+test("keyboard-cover flags a bare TextInput on a screen file, not in a reusable input", () => {
+  const rulesFor = (src, file) => scanSource(src, file).filter((f) => f.rule === "keyboard-cover").map((f) => f.line);
+  const bare = 'import { TextInput, View } from "react-native";\n\nexport default function Login() {\n  return (\n    <View>\n      <TextInput placeholder="Email" />\n    </View>\n  );\n}\n';
+  assert.deepStrictEqual(rulesFor(bare, "app/login.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "app/(auth)/login.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "src/screens/LoginScreen.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "src/features/auth/LoginScreen.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "src\\screens\\Login.tsx"), [6]);
+  const searchBar = 'import { TextInput, View } from "react-native";\n\nexport function SearchBar({ value, onChange }) {\n  return (\n    <View style={styles.bar}>\n      <TextInput value={value} onChangeText={onChange} placeholder="Search" />\n    </View>\n  );\n}\n';
+  assert.deepStrictEqual(rulesFor(searchBar, "components/SearchBar.tsx"), []);
+  assert.deepStrictEqual(rulesFor(searchBar, "app/_layout.tsx"), []);
+  assert.deepStrictEqual(rulesFor(searchBar, "src/myapp/SearchBar.tsx"), []);
+  const scroll = "<ScrollView>\n  <TextInput placeholder=\"Email\" />\n</ScrollView>\n";
+  assert.deepStrictEqual(rulesFor(scroll, "components/Form.tsx"), [2]);
+  const handled = "<KeyboardAvoidingView behavior=\"padding\">\n  <TextInput placeholder=\"Email\" />\n</KeyboardAvoidingView>\n";
+  assert.deepStrictEqual(rulesFor(handled, "app/login.tsx"), []);
+});
+
 test("clickable-div flags Angular (click) and Alpine x-on:click handlers", () => {
   const rulesFor = (src) => scanSource(src, "a.html").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor('<div class="card" (click)="open()">Details</div>\n'), ["clickable-div"]);
@@ -2223,6 +2325,45 @@ test("clickable-div flags click handlers on article and section (issue #231)", (
   assert.deepStrictEqual(rulesFor('<SectionCard onClick={() => choose("pro")}>Pro</SectionCard>\n'), []);
   assert.deepStrictEqual(rulesFor('<article onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</article>\n'), []);
   assert.deepStrictEqual(rulesFor('<section onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</section>\n'), []);
+});
+
+test("clickable-div flags click handlers on headings and paragraphs (issue #264)", () => {
+  const rulesFor = (src, file = "a.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.rule);
+  const linesFor = (src, file = "a.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.line);
+
+  // Issue #264 repro:
+  const repro = [
+    "export function Faq({ toggle }) {",
+    "  return <h3 onClick={toggle}>Shipping</h3>;",
+    "}",
+    "export const Note = ({ open }) => <p onClick={open}>Read more</p>;",
+  ].join("\n");
+  assert.deepStrictEqual(linesFor(repro, "Faq.tsx"), [2, 4]);
+
+  // Flagged forms: h1-h6 and p with various frameworks' click handlers
+  for (const tag of ["h1", "h2", "h3", "h4", "h5", "h6", "p"]) {
+    assert.deepStrictEqual(rulesFor(`<${tag} onClick={toggle}>Title</${tag}>\n`), ["clickable-div"]);
+  }
+  assert.deepStrictEqual(rulesFor('<h2 @click="toggle">Title</h2>\n', "Faq.vue"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<p (click)="toggle()">More</p>\n', "Faq.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<h4 on:click={toggle}>Title</h4>\n', "Faq.svelte"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<p onclick="toggle()">More</p>\n', "Faq.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<h1 onClick$={toggle}>Title</h1>\n'), ["clickable-div"]);
+
+  // Quiet cases: PrimeNG p-button, path, picture, interactive role + tabIndex, and heading/paragraph without click
+  assert.deepStrictEqual(rulesFor('<p-button (click)="save()"></p-button>\n', "Faq.html"), []);
+  assert.deepStrictEqual(rulesFor('<path onClick={save} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<picture onClick={save}><img src="x" alt="x" /></picture>\n'), []);
+  assert.deepStrictEqual(rulesFor('<h3 onClick={toggle} role="button" tabIndex={0}>Shipping</h3>\n'), []);
+  assert.deepStrictEqual(rulesFor('<p onClick={open} role="button" tabIndex={0}>Read more</p>\n'), []);
+  assert.deepStrictEqual(rulesFor('<h3>Shipping</h3>\n'), []);
+  assert.deepStrictEqual(rulesFor('<p>Read more</p>\n'), []);
 });
 
 test("template-theme flags create-vite's #646cff and #535bf2", () => {
