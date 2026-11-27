@@ -17,7 +17,7 @@ A product's marketing site and its app are two scopes. Review one at a time.
 
 These break the web for real people. They are Critical or Noticeable, whatever the look.
 
-- **Real controls.** Actions are `<button>`, navigation is `<a href>`. A `div` or `span` with a click handler is unreachable by keyboard and silent to screen readers [`clickable-div`].
+- **Real controls.** Actions are `<button>`, navigation is `<a href>`. A `div`, `span`, `article` or other non-interactive element with a click handler is unreachable by keyboard and silent to screen readers [`clickable-div`].
 - **Visible focus.** Every interactive element shows a `:focus-visible` style, in the palette, instantly. `outline: none` with nothing in its place locks keyboard users out [`focus-removed`].
 - **Zoom stays on.** No `maximum-scale=1` or `user-scalable=no` [`zoom-disabled`]. Inputs at 16px stop iOS from zooming on focus.
 - **Text alternatives.** Every content image has alt text, including framework image components such as `<Image>`, `<NuxtImg>` and Vuetify's `<v-img>` / `<VImg>`; decoration has `alt=""` [`img-no-alt`].

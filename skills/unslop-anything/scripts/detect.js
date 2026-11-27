@@ -925,7 +925,7 @@ const rules = [
       const hits = [];
       // text-shadow is layered like box-shadow (#200); textShadowColor is React
       // Native's text glow (#201); a filter drop-shadow() is one shadow (#199).
-      for (const m of matches(/\.shadow\(\s*color:\s*([^,)]+)|(?:shadowColor|textShadowColor)\s*[:=]\s*["']?([^"',;\n}]+)|(?:ambientColor|spotColor)\s*=\s*([^,)\n]+)|BoxShadow\(\s*color:\s*([^,)\n]+)|(?:box|text)-shadow:\s*([^;\n]+)|\bshadow-((?:purple|violet|indigo|pink|fuchsia|blue|cyan|teal)-\d{2,3})\b|\bshadow-\[([^\]\n]+)\]|\bdrop-shadow\(((?:[^()\n]|\([^()\n]*\))*)\)/, code)) {
+      for (const m of matches(/\.shadow\(\s*color:\s*([^,)]+)|(?:shadowColor|textShadowColor)\s*[:=]\s*["']?([^"',;\n}]+)|(?:ambientColor|spotColor)\s*=\s*([^,)\n]+)|\b(?:BoxShadow|Shadow)\(\s*color:\s*([^,)\n]+)|(?:box|text)-shadow:\s*([^;\n]+)|\bshadow-((?:purple|violet|indigo|pink|fuchsia|blue|cyan|teal)-\d{2,3})\b|\bshadow-\[([^\]\n]+)\]|\bdrop-shadow\(((?:[^()\n]|\([^()\n]*\))*)\)/, code)) {
         const raw = m.slice(1).find(Boolean) || "";
         const layers = m[5] || m[7] ? glowLayers(raw.replace(/_/g, " ")) : raw ? [raw] : [];
         if (layers.some((value) => isGlowValue(value, stack))) hits.push(m.index);
@@ -1377,13 +1377,13 @@ const rules = [
     family: "accessibility",
     severity: "noticeable",
     stacks: ["js", "web"],
-    message: "Click handler on a div or span. Keyboard and screen reader users cannot reach it.",
+    message: "Click handler on a non-interactive element such as a div, span or article. Keyboard and screen reader users cannot reach it.",
     fix: "Use a <button> for actions and an <a href> for navigation. They come with focus, Enter and Space, and the right role.",
     find({ code }) {
       const hits = [];
       // Each opening tag is read to its real end first, so an arrow function in an earlier
       // attribute (`onKeyDown={(e) => ...}`) does not hide the click handler after it.
-      for (const m of matches(/<(?:div|span|li|td|img|a)\b/, code)) {
+      for (const m of matches(/<(?:div|span|li|td|img|a|article|section)\b/, code)) {
         const end = tagEnd(code, m.index + m[0].length);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
         // Only this element's own attributes: a nested element inside {...} is checked on its own.

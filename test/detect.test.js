@@ -1910,6 +1910,46 @@ test("clickable-div flags Qwik onClick$ handlers (issue #178)", () => {
   assert.deepStrictEqual(lines('<button onClick$={() => open()}>Open</button>\n'), []);
 });
 
+test("clickable-div flags click handlers on article and section (issue #231)", () => {
+  const rulesFor = (src, file = "Plan.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.rule);
+  const linesFor = (src, file = "Plan.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.line);
+
+  // Issue #231 repro:
+  const repro = [
+    "export function Plan() {",
+    "  return (",
+    '    <article className="card" onClick={() => choose("pro")}>',
+    "      Pro plan",
+    "    </article>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(linesFor(repro, "Plan.tsx"), [3]);
+
+  // Flagged forms across article and section with various click handlers
+  assert.deepStrictEqual(rulesFor('<article onClick={() => choose("pro")}>Pro</article>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<section onClick={() => choose("pro")}>Pro</section>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<article @click="choose">Pro</article>\n', "Plan.vue"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<section (click)="choose()">Pro</section>\n', "Plan.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<article on:click={choose}>Pro</article>\n', "Plan.svelte"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<section onclick="choose()">Pro</section>\n', "Plan.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<article onClick$={() => choose("pro")}>Pro</article>\n'), ["clickable-div"]);
+
+  // Quiet cases: no handler, components with Article/Section prefixes, interactive role + tabIndex
+  assert.deepStrictEqual(rulesFor('<article className="card">Pro plan</article>\n'), []);
+  assert.deepStrictEqual(rulesFor('<section className="card">Pro plan</section>\n'), []);
+  assert.deepStrictEqual(rulesFor('<ArticleCard onClick={() => choose("pro")}>Pro</ArticleCard>\n'), []);
+  assert.deepStrictEqual(rulesFor('<SectionCard onClick={() => choose("pro")}>Pro</SectionCard>\n'), []);
+  assert.deepStrictEqual(rulesFor('<article onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</article>\n'), []);
+  assert.deepStrictEqual(rulesFor('<section onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</section>\n'), []);
+});
+
 test("template-theme flags create-vite's #646cff and #535bf2", () => {
   const rulesFor = (src) => scanSource(src, "index.css").map((f) => f.rule).filter((r) => r === "template-theme");
   assert.deepStrictEqual(rulesFor("a {\n  font-weight: 500;\n  color: #646cff;\n}\na:hover {\n  color: #535bf2;\n}\n"), ["template-theme"]);
@@ -2138,4 +2178,30 @@ test('hover-scale flags "&:hover" and ":hover" in JS style objects (issue #236)'
   assert.deepStrictEqual(rulesFor('<div sx={{ "&:active": { transform: "scale(0.98)" } }} />\n'), []);
   assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translateY(2px)" } }} />\n'), []);
   assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { backgroundColor: "#eee" } }} />\n'), []);
+});
+
+test("glow-shadow flags Flutter text Shadow(color: ...), not neutral ones (issue #230)", () => {
+  const glowLines = (src, file = "title.dart") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.line);
+  // Issue #230 repro:
+  const repro = [
+    "import 'package:flutter/material.dart';",
+    "",
+    "const title = Text(",
+    "  'Pro',",
+    "  style: TextStyle(",
+    "    shadows: [Shadow(color: Colors.purple, blurRadius: 20)],",
+    "  ),",
+    ");",
+  ].join("\n");
+  assert.deepStrictEqual(glowLines(repro, "title.dart"), [6]);
+
+  // Colored Shadow and BoxShadow
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Colors.purple, blurRadius: 20);\n"), [1]);
+  assert.deepStrictEqual(glowLines("const s = BoxShadow(color: Colors.purple, blurRadius: 20);\n"), [1]);
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Color(0xFF7C3AED), blurRadius: 16);\n"), [1]);
+
+  // Neutral cases stay quiet
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Colors.black26, blurRadius: 4);\n"), []);
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Color(0x42000000));\n"), []);
+  assert.deepStrictEqual(glowLines("const s = BoxShadow(color: Colors.black54, blurRadius: 4);\n"), []);
 });
