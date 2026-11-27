@@ -1397,6 +1397,32 @@ test("nested-cards flags Quasar q-card and Element Plus el-card nesting, not the
   assert.deepStrictEqual(cardLines(quasarParts), []);
 });
 
+test("nested-cards flags Naive UI n-card and Ant Design Vue a-card nesting, not their card parts (issue #266)", () => {
+  const cardLines = (src, file = "Plans.vue") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "nested-cards").map((f) => [f.line, f.severity]);
+  // Issue #266 repro:
+  const repro = [
+    "<template>",
+    "  <n-card>",
+    "    <n-card>Pro plan</n-card>",
+    "  </n-card>",
+    "  <a-card>",
+    "    <a-card>Team plan</a-card>",
+    "  </a-card>",
+    "</template>",
+  ].join("\n");
+  assert.deepStrictEqual(cardLines(repro), [[2, "noticeable"], [5, "noticeable"]]);
+
+  // PascalCase variants
+  assert.deepStrictEqual(cardLines("<template>\n  <NCard>\n    <NCard>Pro plan</NCard>\n  </NCard>\n</template>\n"), [[2, "noticeable"]]);
+  assert.deepStrictEqual(cardLines("<template>\n  <ACard>\n    <ACard>Team plan</ACard>\n  </ACard>\n</template>\n"), [[2, "noticeable"]]);
+
+  // Card parts inside one card stay quiet
+  const aCardParts = '<template>\n  <a-card>\n    <a-card-meta title="Title" />\n    <a-card-grid>Grid</a-card-grid>\n  </a-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(aCardParts), []);
+  const aCardPartsPascal = '<template>\n  <ACard>\n    <ACardMeta title="Title" />\n    <ACardGrid>Grid</ACardGrid>\n  </ACard>\n</template>\n';
+  assert.deepStrictEqual(cardLines(aCardPartsPascal), []);
+});
+
 test("nested-cards reads opening tags with tagEnd so arrows or > in props do not misread sibling cards", () => {
   const rulesFor = (src, file = "a.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor("<Card onClick={() => open()} />\n<Card><p>Second</p></Card>\n"), []);
