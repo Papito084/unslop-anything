@@ -2010,16 +2010,20 @@ test("drawer-nav catches every style of the hamburger icon (issue #146)", () => 
   assert.deepStrictEqual(lines('<Ionicons name="menu-sharp-outline" />\n', "Header.tsx"), []);
 });
 
-test("drawer-nav catches Heroicons Bars3Icon and Tabler IconMenu2, not dropdown menus or overflow icons", () => {
+test("drawer-nav catches Heroicons Bars3Icon, Tabler IconMenu2 and Ionic IonMenu, not dropdown menus or overflow icons", () => {
   const lines = (src, file = "Header.tsx") => scanSource(src, file).filter((f) => f.rule === "drawer-nav").map((f) => [f.line, f.severity]);
   // Issue #204: the repro. The rule reports the first hit in a file.
   const repro = 'import { Bars3Icon } from "react-native-heroicons/outline";\nimport { IconMenu2 } from "@tabler/icons-react-native";\n\nexport function Header() {\n  return <Bars3Icon size={24} />;\n}\n';
   assert.deepStrictEqual(lines(repro), [[1, "noticeable"]]);
-  for (const icon of ["Bars3Icon", "Bars3BottomLeftIcon", "IconMenu2"]) {
+  for (const icon of ["Bars3Icon", "Bars3BottomLeftIcon", "IconMenu2", "IonMenu", "IonMenuButton", "ion-menu", "ion-menu-button"]) {
     assert.deepStrictEqual(lines(`<${icon} size={24} />\n`).map(([line]) => line), [1], icon);
   }
   assert.deepStrictEqual(lines('import Menu from "@mui/material/Menu";\n<Menu open={open} />\n'), []);
   assert.deepStrictEqual(lines("<EllipsisVerticalIcon size={24} />\n"), []);
+  // Issue #248: Ionic React's IonMenu is reported on the tag, not the import.
+  const ionic = 'import { IonMenu, IonContent, IonList, IonItem } from "@ionic/react";\n\nexport function Menu() {\n  return (\n    <IonMenu contentId="main">\n      <IonContent />\n    </IonMenu>\n  );\n}\n';
+  assert.deepStrictEqual(lines(ionic, "App.tsx"), [[5, "noticeable"]]);
+  assert.deepStrictEqual(lines("<IonTabs>\n  <IonTabBar slot=\"bottom\" />\n</IonTabs>\n"), []);
 });
 
 test("drawer-nav catches React Native Paper's icon=\"menu\" (issue #226)", () => {
