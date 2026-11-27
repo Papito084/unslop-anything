@@ -1255,6 +1255,20 @@ test("nested-cards flags Vuetify v-card and Angular Material mat-card nesting, n
   assert.deepStrictEqual(cardLines(matParts, "plans.component.html"), []);
 });
 
+test("nested-cards flags Quasar q-card and Element Plus el-card nesting, not their card parts (issue #228)", () => {
+  const cardLines = (src, file = "Plans.vue") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "nested-cards").map((f) => [f.line, f.severity]);
+  // Issue #228 repro:
+  const quasar = '<template>\n  <q-card>\n    <q-card>Pro plan</q-card>\n  </q-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(quasar), [[2, "noticeable"]]);
+
+  const elementPlus = '<template>\n  <el-card>\n    <el-card>Pro plan</el-card>\n  </el-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(elementPlus), [[2, "noticeable"]]);
+
+  // Card parts inside one card stay quiet
+  const quasarParts = '<template>\n  <q-card>\n    <q-card-section>Pro</q-card-section>\n    <q-card-actions><q-btn label="Go" /></q-card-actions>\n  </q-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(quasarParts), []);
+});
+
 test("nested-cards reads opening tags with tagEnd so arrows or > in props do not misread sibling cards", () => {
   const rulesFor = (src, file = "a.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor("<Card onClick={() => open()} />\n<Card><p>Second</p></Card>\n"), []);
@@ -1307,6 +1321,17 @@ test("img-no-alt flags Vuetify's v-img and VImg without alt", () => {
   assert.deepStrictEqual(altLines('<VImg src="/divider.png" alt="" />\n'), []);
   assert.deepStrictEqual(altLines('<v-img :src="photo.url" :alt="photo.caption" />\n'), []);
   assert.deepStrictEqual(altLines('<v-img-gallery src="/hero.png" />\n'), []);
+});
+
+test("img-no-alt flags Ionic's ion-img and IonImg without alt (issue #235)", () => {
+  const altLines = (src, file = "Hero.vue") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "img-no-alt").map((f) => f.line);
+  // Issue #235: the repro.
+  assert.deepStrictEqual(altLines('<template>\n  <ion-img src="/hero.png" />\n  <IonImg src="/team.png" />\n</template>\n'), [2, 3]);
+  assert.deepStrictEqual(altLines('<ion-img src="/hero.png" alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(altLines('<IonImg src="/divider.png" alt="" />\n'), []);
+  assert.deepStrictEqual(altLines('<ion-img :src="photo.url" :alt="photo.caption" />\n'), []);
+  assert.deepStrictEqual(altLines('<IonImg src="/hero.png" alt={caption} />\n', "Hero.tsx"), []);
+  assert.deepStrictEqual(altLines('<ion-img-viewer src="/hero.png" />\n'), []);
 });
 
 test("placeholder-label flags inputs that use a placeholder as their only label", () => {
@@ -1933,6 +1958,46 @@ test("clickable-div flags Qwik onClick$ handlers (issue #178)", () => {
   assert.deepStrictEqual(lines('<button onClick$={() => open()}>Open</button>\n'), []);
 });
 
+test("clickable-div flags click handlers on article and section (issue #231)", () => {
+  const rulesFor = (src, file = "Plan.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.rule);
+  const linesFor = (src, file = "Plan.tsx") =>
+    scanSource(src, file)
+      .filter((f) => f.rule === "clickable-div")
+      .map((f) => f.line);
+
+  // Issue #231 repro:
+  const repro = [
+    "export function Plan() {",
+    "  return (",
+    '    <article className="card" onClick={() => choose("pro")}>',
+    "      Pro plan",
+    "    </article>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(linesFor(repro, "Plan.tsx"), [3]);
+
+  // Flagged forms across article and section with various click handlers
+  assert.deepStrictEqual(rulesFor('<article onClick={() => choose("pro")}>Pro</article>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<section onClick={() => choose("pro")}>Pro</section>\n'), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<article @click="choose">Pro</article>\n', "Plan.vue"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<section (click)="choose()">Pro</section>\n', "Plan.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<article on:click={choose}>Pro</article>\n', "Plan.svelte"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<section onclick="choose()">Pro</section>\n', "Plan.html"), ["clickable-div"]);
+  assert.deepStrictEqual(rulesFor('<article onClick$={() => choose("pro")}>Pro</article>\n'), ["clickable-div"]);
+
+  // Quiet cases: no handler, components with Article/Section prefixes, interactive role + tabIndex
+  assert.deepStrictEqual(rulesFor('<article className="card">Pro plan</article>\n'), []);
+  assert.deepStrictEqual(rulesFor('<section className="card">Pro plan</section>\n'), []);
+  assert.deepStrictEqual(rulesFor('<ArticleCard onClick={() => choose("pro")}>Pro</ArticleCard>\n'), []);
+  assert.deepStrictEqual(rulesFor('<SectionCard onClick={() => choose("pro")}>Pro</SectionCard>\n'), []);
+  assert.deepStrictEqual(rulesFor('<article onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</article>\n'), []);
+  assert.deepStrictEqual(rulesFor('<section onClick={() => choose("pro")} role="button" tabIndex={0}>Pro</section>\n'), []);
+});
+
 test("template-theme flags create-vite's #646cff and #535bf2", () => {
   const rulesFor = (src) => scanSource(src, "index.css").map((f) => f.rule).filter((r) => r === "template-theme");
   assert.deepStrictEqual(rulesFor("a {\n  font-weight: 500;\n  color: #646cff;\n}\na:hover {\n  color: #535bf2;\n}\n"), ["template-theme"]);
@@ -2116,4 +2181,75 @@ test("slop-gradient reads Compose Color(red = ..., green = ..., blue = ...) stop
     "Color(red = r, green = g, blue = b), Color(red = redVar, green = 58, blue = 237)",
   ];
   for (const stops of quiet) assert.deepStrictEqual(rulesFor(gradient(stops)), [], stops);
+});
+
+test('hover-scale flags "&:hover" and ":hover" in JS style objects (issue #236)', () => {
+  const rulesFor = (src, file = "Feature.tsx") =>
+    scanSource(src, file, { kind: "web" })
+      .filter((f) => f.rule === "hover-scale")
+      .map((f) => f.rule);
+
+  const repro = [
+    'import Card from "@mui/material/Card";',
+    "",
+    "export function Feature() {",
+    "  return (",
+    '    <Card sx={{ "&:hover": { transform: "scale(1.05)" } }}>',
+    "      Fast",
+    "    </Card>",
+    "  );",
+    "}",
+    "",
+    "export function Lift() {",
+    '  return <Card sx={{ "&:hover": { transform: "translateY(-4px)" } }}>Lift</Card>;',
+    "}",
+  ].join("\n");
+
+  assert.deepStrictEqual(
+    scanSource(repro, "Feature.tsx", { kind: "web" })
+      .filter((f) => f.rule === "hover-scale")
+      .map((f) => [f.rule, f.line]),
+    [["hover-scale", 5], ["hover-scale", 12]]
+  );
+
+  // Quoted '&:hover', ":hover", ':hover' variants
+  assert.deepStrictEqual(rulesFor('<div sx={{ \'&:hover\': { transform: "scale(1.05)" } }} />\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<div sx={{ ":hover": { transform: "scale(1.05)" } }} />\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<div sx={{ \':hover\': { transform: "scale(1.05)" } }} />\n'), ["hover-scale"]);
+
+  // translate() lift variants
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translate(0, -4px)" } }} />\n'), ["hover-scale"]);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translate3d(0, -4px, 0)" } }} />\n'), ["hover-scale"]);
+
+  // Quiet cases
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "scale(1.01)" } }} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:active": { transform: "scale(0.98)" } }} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { transform: "translateY(2px)" } }} />\n'), []);
+  assert.deepStrictEqual(rulesFor('<div sx={{ "&:hover": { backgroundColor: "#eee" } }} />\n'), []);
+});
+
+test("glow-shadow flags Flutter text Shadow(color: ...), not neutral ones (issue #230)", () => {
+  const glowLines = (src, file = "title.dart") => scanSource(src, file).filter((f) => f.rule === "glow-shadow").map((f) => f.line);
+  // Issue #230 repro:
+  const repro = [
+    "import 'package:flutter/material.dart';",
+    "",
+    "const title = Text(",
+    "  'Pro',",
+    "  style: TextStyle(",
+    "    shadows: [Shadow(color: Colors.purple, blurRadius: 20)],",
+    "  ),",
+    ");",
+  ].join("\n");
+  assert.deepStrictEqual(glowLines(repro, "title.dart"), [6]);
+
+  // Colored Shadow and BoxShadow
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Colors.purple, blurRadius: 20);\n"), [1]);
+  assert.deepStrictEqual(glowLines("const s = BoxShadow(color: Colors.purple, blurRadius: 20);\n"), [1]);
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Color(0xFF7C3AED), blurRadius: 16);\n"), [1]);
+
+  // Neutral cases stay quiet
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Colors.black26, blurRadius: 4);\n"), []);
+  assert.deepStrictEqual(glowLines("const s = Shadow(color: Color(0x42000000));\n"), []);
+  assert.deepStrictEqual(glowLines("const s = BoxShadow(color: Colors.black54, blurRadius: 4);\n"), []);
 });
