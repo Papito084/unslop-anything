@@ -1152,7 +1152,7 @@ test("clickable-div flags a href-less anchor with onClick", () => {
   assert.deepStrictEqual(findingsFor('<a onClick={go} tabIndex={0}>Go</a>\n').map((f) => f.rule), ["clickable-div"]);
 });
 
-test("clickable-div requires both an interactive role and tabIndex on div/span/li/td/img", () => {
+test("clickable-div requires both an interactive role and tabIndex on div/span/li/td/tr/img", () => {
   const rulesFor = (src, file = "a.tsx") =>
     scanSource(src, file)
       .filter((f) => f.rule === "clickable-div")
@@ -1167,6 +1167,35 @@ test("clickable-div requires both an interactive role and tabIndex on div/span/l
   assert.deepStrictEqual(rulesFor('<div role="button" tabIndex={0} onClick={open}>Open</div>\n'), []);
   assert.deepStrictEqual(rulesFor('<div role="button" :tabindex="0" @click="open">Open</div>\n', "A.vue"), []);
   assert.deepStrictEqual(rulesFor('<div role="button" tabindex="0" on:click={open}>Open</div>\n', "A.svelte"), []);
+});
+
+test("clickable-div flags click handlers on table rows (issue #247)", () => {
+  const lines = (src, file = "Orders.tsx") => scanSource(src, file).filter((f) => f.rule === "clickable-div").map((f) => f.line);
+  const repro = [
+    "export function Orders({ orders, open }) {",
+    "  return (",
+    "    <table>",
+    "      <tbody>",
+    "        {orders.map((o) => (",
+    "          <tr key={o.id} onClick={() => open(o.id)}>",
+    "            <td>{o.number}</td>",
+    "          </tr>",
+    "        ))}",
+    "      </tbody>",
+    "    </table>",
+    "  );",
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [6]);
+  assert.deepStrictEqual(lines('<tr @click="open">\n  <td>Open</td>\n</tr>\n', "Orders.vue"), [1]);
+  assert.deepStrictEqual(lines('<tr (click)="open()">\n  <td>Open</td>\n</tr>\n', "orders.component.html"), [1]);
+  assert.deepStrictEqual(lines("<tr on:click={open}>\n  <td>Open</td>\n</tr>\n", "Orders.svelte"), [1]);
+  assert.deepStrictEqual(lines('<tr role="button" onClick={open}>\n  <td>Open</td>\n</tr>\n'), [1]);
+  // Quiet: no handler, a component row, an interactive role with tabIndex, and <track>.
+  assert.deepStrictEqual(lines("<tr>\n  <td>Open</td>\n</tr>\n"), []);
+  assert.deepStrictEqual(lines("<TableRow onClick={open}>\n  <TableCell>Open</TableCell>\n</TableRow>\n"), []);
+  assert.deepStrictEqual(lines('<tr role="button" tabIndex={0} onClick={open}>\n  <td>Open</td>\n</tr>\n'), []);
+  assert.deepStrictEqual(lines('<track kind="captions" onClick={open} />\n'), []);
 });
 
 test("tagEnd skips strings inside an attribute expression", () => {
