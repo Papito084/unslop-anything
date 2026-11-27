@@ -1431,6 +1431,9 @@ const rules = [
         // The longhand: `outline-style: none` in CSS and `outlineStyle: "none"`
         // in a JS style object (#250) remove the focus outline just the same.
         for (const m of matches(/outline-style\s*:\s*["']?none\b["']?|outlineStyle\s*:\s*["']?none\b["']?/, code)) hits.push(m.index);
+        // Setting the width to zero (`outline-width: 0` in CSS, `outlineWidth: 0`
+        // in a JS style object, #263) hides the focus ring just the same.
+        for (const m of matches(/(?:outline-width|outlineWidth)\s*:\s*["']?0(?:px)?(?![.\d])\b["']?/, code)) hits.push(m.index);
       }
       return hits;
     },

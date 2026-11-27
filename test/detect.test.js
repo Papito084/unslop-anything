@@ -1308,6 +1308,28 @@ test("focus-removed flags outline-style: none and outlineStyle: \"none\" (issue 
   assert.deepStrictEqual(lines("input:focus { outline-style: none; } input:focus-visible { outline: 2px solid blue; }\n", "field.css"), []);
 });
 
+test("focus-removed flags outline-width: 0 and outlineWidth: 0 (issue #263)", () => {
+  const lines = (src, file = "Field.tsx") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "focus-removed").map((f) => f.line);
+  // Issue #263 repro:
+  assert.deepStrictEqual(lines('export const Field = () => <input style={{ outlineWidth: 0 }} aria-label="Email" />;\n'), [1]);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0; }\n", "field.css"), [1]);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0px; }\n", "field.css"), [1]);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: "0" }} />\n'), [1]);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: "0px" }} />\n'), [1]);
+  assert.deepStrictEqual(lines("<input style={{ outlineWidth: '0' }} />\n"), [1]);
+  // The quiet cases: a real outline width, and a file with a focus-visible style.
+  assert.deepStrictEqual(lines("input:focus { outline-width: 2px; }\n", "field.css"), []);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: 2 }} />\n'), []);
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: "2px" }} />\n'), []);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0.5px; }\n", "field.css"), []);
+  assert.deepStrictEqual(
+    lines('export const Field = () => <input style={{ outlineWidth: 0 }} />;\n:focus-visible { outline: 2px solid blue; }\n'),
+    [],
+  );
+  assert.deepStrictEqual(lines('<input style={{ outlineWidth: 0 }} className="focus-visible:ring-2" />\n'), []);
+  assert.deepStrictEqual(lines("input:focus { outline-width: 0; } input:focus-visible { outline: 2px solid blue; }\n", "field.css"), []);
+});
+
 test("nested-cards flags PascalCase kit cards like IonCard, VCard, QCard and ElCard (issue #245)", () => {
   const lines = (src, file = "Plans.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.line);
   const repro = [
