@@ -990,7 +990,8 @@ const rules = [
       const hits = [];
       if (stack === "js" || stack === "web") {
         // Vuetify's v-card, Angular Material's mat-card, Quasar's q-card and Element Plus's el-card nest like ion-card (#202, #228).
-        for (const m of matches(/<(Card|IonCard|ion-card|VCard|v-card|mat-card|QCard|q-card|ElCard|el-card)(?=[\s/>])/, code)) {
+        // Naive UI's n-card and Ant Design Vue's a-card nest like ion-card too (#266).
+        for (const m of matches(/<(Card|IonCard|ion-card|VCard|v-card|mat-card|QCard|q-card|ElCard|el-card|NCard|n-card|ACard|a-card)(?=[\s/>])/, code)) {
           const end = tagEnd(code, m.index + m[0].length);
           if (end === -1) continue;
           if (/\/\s*$/.test(code.slice(m.index + m[0].length, end))) continue;
@@ -1044,7 +1045,7 @@ const rules = [
       // when the literal is exactly that symbol; substrings and apostrophes
       // inside longer text stay quiet.
       const symbol = /^(?:sparkles?(?:\.[a-z0-9._-]+)?|wand\.and\.(?:stars|sparkles)(?:\.[a-z0-9._-]+)?|[a-z0-9-]+:sparkles?|i-[a-z0-9-]+-sparkles?|wand-magic-sparkles)$/;
-      const re = /\bauto_awesome\b|\bAutoAwesome(?:Outlined|Rounded|Sharp|TwoTone)?(?:Icon)?\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bIconSparkles\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨|\b(?:Hi(?:Outline|Mini)?|Lu|Tb|Pi|Bs|Io|Ri)Sparkles?(?:Fill|Line|Outline|Sharp|Bold|Duotone|Light|Thin)?\b|\bRiSparkling(?:2)?(?:Fill|Line)?\b|\bMd(?:Outline|Round|Sharp|TwoTone)?AutoAwesome\b|\bfaWandMagicSparkles\b|(?<![\w-])fa-wand-magic-sparkles(?![\w-])|(?<![\w-])ri-sparkling(?:-2)?-(?:line|fill)(?![\w-])/;
+      const re = /\bauto_awesome\b|\bAutoAwesome(?:Outlined|Rounded|Sharp|TwoTone)?(?:Icon)?\b|\bSparkles\b|\bSparklesIcon\b|\bSparkle\b|\bSparkleIcon\b|\bIconSparkles\b|\bWandSparkles\b|\bWandSparklesIcon\b|✨|\b(?:Hi(?:Outline|Mini)?|Lu|Tb|Pi|Bs|Io|Ri)Sparkles?(?:Fill|Line|Outline|Sharp|Bold|Duotone|Light|Thin)?\b|\bRiSparkling(?:2)?(?:Fill|Line)?\b|\bMd(?:Outline|Round|Sharp|TwoTone)?AutoAwesome\b|\bfa(?:WandMagic)?Sparkles\b|(?<![\w-])fa-(?:wand-magic-)?sparkles(?![\w-])|(?<![\w-])ri-sparkling(?:-2)?-(?:line|fill)(?![\w-])/;
       const hits = [...matches(re, code)].map((m) => m.index);
 
       for (const literal of stringLiterals(code, stack)) {
@@ -1175,7 +1176,7 @@ const rules = [
     message: "Hamburger menu or navigation drawer. It hides the top destinations behind a tap.",
     fix: "Ask first. Use tabs for three to five peer destinations; keep a drawer only for many destinations or a large-screen rail.",
     find({ code }) {
-      const re = /["']line\.(?:3\.horizontal|horizontal\.3)["']|\bIcons\.(?:Default\.|Filled\.|Outlined\.|Rounded\.|Sharp\.)?Menu\b|\bIcons\.menu(?:_rounded|_outlined|_sharp)?\b|\b(?:name|icon)=["']menu(?:-outline|-sharp)?["']|\bcreateDrawerNavigator\b|from\s+["']expo-router\/drawer["']|\bModalNavigationDrawer\b|\bdrawer:\s*(?:const\s+)?\w*Drawer\b|<ion-menu\b|<IonMenu(?:Button)?\b|\bBars3(?:BottomLeft|BottomRight|CenterLeft)?Icon\b|\bIconMenu2\b/;
+      const re = /["']line\.(?:3\.horizontal|horizontal\.3)["']|\bIcons\.(?:Default\.|Filled\.|Outlined\.|Rounded\.|Sharp\.)?Menu\b|\bIcons\.menu(?:_rounded|_outlined|_sharp)?\b|\b(?:name|icon)=["']menu(?:-outline|-sharp)?["']|\bcreateDrawerNavigator\b|from\s+["']expo-router\/drawer["']|\bModalNavigationDrawer\b|\bdrawer:\s*(?:const\s+)?\w*Drawer\b|<ion-menu\b|<IonMenu(?:Button|Toggle)?\b|\bBars3(?:BottomLeft|BottomRight|CenterLeft)?Icon\b|\bIconMenu2\b/;
       const first = matches(re, code).next();
       return first.done ? [] : [first.value.index];
     },
@@ -1200,10 +1201,13 @@ const rules = [
     stacks: ["js"],
     message: "Screen with a text input and no keyboard handling. The keyboard may cover the field.",
     fix: "Use KeyboardAvoidingView, automaticallyAdjustKeyboardInsets, or the project's keyboard library, and set keyboardShouldPersistTaps on the scroll view. Check it on a small phone.",
-    find({ code }) {
+    find({ code, file }) {
       const input = /<TextInput\b/.exec(code);
       if (!input) return [];
-      if (!/<(?:ScrollView|FlatList|FlashList|SafeAreaView|KeyboardAwareScrollView)\b/.test(code)) return [];
+      const where = file.replace(/\\/g, "/");
+      const name = path.basename(where).replace(/\.[^.]+$/, "");
+      const screenPath = /(?:^|\/)screens\//.test(where) || /Screen$/.test(name) || (/(?:^|\/)app\//.test(where) && !name.startsWith("_"));
+      if (!screenPath && !/<(?:ScrollView|FlatList|FlashList|SafeAreaView|KeyboardAwareScrollView)\b/.test(code)) return [];
       if (/KeyboardAvoidingView|KeyboardAware|KeyboardProvider|KeyboardStickyView|KeyboardController|automaticallyAdjustKeyboardInsets|keyboardShouldPersistTaps/.test(code)) return [];
       return [input.index];
     },
@@ -1383,7 +1387,7 @@ const rules = [
       const hits = [];
       // Each opening tag is read to its real end first, so an arrow function in an earlier
       // attribute (`onKeyDown={(e) => ...}`) does not hide the click handler after it.
-      for (const m of matches(/<(?:div|span|li|td|tr|img|a|article|section)\b/, code)) {
+      for (const m of matches(/<(?:div|span|li|td|tr|img|a|article|section|h[1-6]|p)(?=[\s/>])/, code)) {
         const end = tagEnd(code, m.index + m[0].length);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
         // Only this element's own attributes: a nested element inside {...} is checked on its own.
@@ -1431,6 +1435,9 @@ const rules = [
         // The longhand: `outline-style: none` in CSS and `outlineStyle: "none"`
         // in a JS style object (#250) remove the focus outline just the same.
         for (const m of matches(/outline-style\s*:\s*["']?none\b["']?|outlineStyle\s*:\s*["']?none\b["']?/, code)) hits.push(m.index);
+        // Setting the width to zero (`outline-width: 0` in CSS, `outlineWidth: 0`
+        // in a JS style object, #263) hides the focus ring just the same.
+        for (const m of matches(/(?:outline-width|outlineWidth)\s*:\s*["']?0(?:px)?(?![.\d])\b["']?/, code)) hits.push(m.index);
       }
       return hits;
     },
@@ -1448,10 +1455,11 @@ const rules = [
       // Vuetify renders <v-img> / <VImg> as an <img> too (#229).
       // Ionic renders <ion-img> / <IonImg> as an <img> too (#235).
       // Quasar renders <q-img> / <QImg> and Element Plus <el-image> / <ElImage> as <img> too (#249).
-      for (const m of matches(/<(?:img|Image|NuxtImg|NuxtPicture|nuxt-img|nuxt-picture|v-img|VImg|ion-img|IonImg|q-img|QImg|el-image|ElImage)(?=[\s/>])/, code)) {
+      // Astro renders <Picture> as an <img> too (#268).
+      for (const m of matches(/<(?:img|Image|Picture|NuxtImg|NuxtPicture|nuxt-img|nuxt-picture|v-img|VImg|ion-img|IonImg|q-img|QImg|el-image|ElImage)(?=[\s/>])/, code)) {
         const end = tagEnd(code, m.index);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
-        if (tag.startsWith("<Image") && !/\ssrc\s*=/.test(tag)) continue;
+        if ((tag.startsWith("<Image") || tag.startsWith("<Picture")) && !/\ssrc\s*=/.test(tag)) continue;
         const hasAlt = /[\s:\[.]alt\]?\s*=|\{\s*alt\s*\}|\{\s*\.\.\./.test(tag)
           || (stack === "web" && /\salt(?=[\s/>]|$)/.test(tag));
         if (!hasAlt) hits.push(m.index);
