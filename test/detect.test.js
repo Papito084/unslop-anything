@@ -2004,6 +2004,17 @@ test("sparkle-icon flags Font Awesome's wand-magic-sparkles, not the plain wand"
   assert.deepStrictEqual(sparkleLines('<FontAwesomeIcon icon="wand-magic" />\n'), []);
 });
 
+test("sparkle-icon flags Font Awesome's faSparkles and fa-sparkles (issue #267)", () => {
+  const sparkleLines = (src) => scanSource(src, "Ai.tsx").filter((f) => f.rule === "sparkle-icon").map((f) => f.line);
+  assert.deepStrictEqual(sparkleLines('import { faSparkles } from "@fortawesome/pro-solid-svg-icons";\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-sparkles" />\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('<i class="fa-sparkles text-lg"></i>\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('import { faStar } from "@fortawesome/free-solid-svg-icons";\n'), []);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-star" />\n'), []);
+  assert.deepStrictEqual(sparkleLines('const copy = "magic sparkles in the sky";\n'), []);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-wand-magic-sparkles" />\n'), [1]);
+});
+
 test("blankComments keeps slashes inside Swift raw strings and still finds later symbols", () => {
   const src = [
     'let label = #"A "// B"#',
@@ -2151,6 +2162,24 @@ test("drawer-nav catches React Native Paper's icon=\"menu\" (issue #226)", () =>
   // Other Paper icons stay quiet
   assert.deepStrictEqual(lines('<IconButton icon="menu-down" />\n'), []);
   assert.deepStrictEqual(lines('<Appbar.Action icon="dots-vertical" />\n'), []);
+});
+
+test("keyboard-cover flags a bare TextInput on a screen file, not in a reusable input", () => {
+  const rulesFor = (src, file) => scanSource(src, file).filter((f) => f.rule === "keyboard-cover").map((f) => f.line);
+  const bare = 'import { TextInput, View } from "react-native";\n\nexport default function Login() {\n  return (\n    <View>\n      <TextInput placeholder="Email" />\n    </View>\n  );\n}\n';
+  assert.deepStrictEqual(rulesFor(bare, "app/login.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "app/(auth)/login.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "src/screens/LoginScreen.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "src/features/auth/LoginScreen.tsx"), [6]);
+  assert.deepStrictEqual(rulesFor(bare, "src\\screens\\Login.tsx"), [6]);
+  const searchBar = 'import { TextInput, View } from "react-native";\n\nexport function SearchBar({ value, onChange }) {\n  return (\n    <View style={styles.bar}>\n      <TextInput value={value} onChangeText={onChange} placeholder="Search" />\n    </View>\n  );\n}\n';
+  assert.deepStrictEqual(rulesFor(searchBar, "components/SearchBar.tsx"), []);
+  assert.deepStrictEqual(rulesFor(searchBar, "app/_layout.tsx"), []);
+  assert.deepStrictEqual(rulesFor(searchBar, "src/myapp/SearchBar.tsx"), []);
+  const scroll = "<ScrollView>\n  <TextInput placeholder=\"Email\" />\n</ScrollView>\n";
+  assert.deepStrictEqual(rulesFor(scroll, "components/Form.tsx"), [2]);
+  const handled = "<KeyboardAvoidingView behavior=\"padding\">\n  <TextInput placeholder=\"Email\" />\n</KeyboardAvoidingView>\n";
+  assert.deepStrictEqual(rulesFor(handled, "app/login.tsx"), []);
 });
 
 test("clickable-div flags Angular (click) and Alpine x-on:click handlers", () => {
