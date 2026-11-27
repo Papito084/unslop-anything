@@ -1309,6 +1309,17 @@ test("img-no-alt flags Vuetify's v-img and VImg without alt", () => {
   assert.deepStrictEqual(altLines('<v-img-gallery src="/hero.png" />\n'), []);
 });
 
+test("img-no-alt flags Ionic's ion-img and IonImg without alt (issue #235)", () => {
+  const altLines = (src, file = "Hero.vue") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "img-no-alt").map((f) => f.line);
+  // Issue #235: the repro.
+  assert.deepStrictEqual(altLines('<template>\n  <ion-img src="/hero.png" />\n  <IonImg src="/team.png" />\n</template>\n'), [2, 3]);
+  assert.deepStrictEqual(altLines('<ion-img src="/hero.png" alt="Team photo" />\n'), []);
+  assert.deepStrictEqual(altLines('<IonImg src="/divider.png" alt="" />\n'), []);
+  assert.deepStrictEqual(altLines('<ion-img :src="photo.url" :alt="photo.caption" />\n'), []);
+  assert.deepStrictEqual(altLines('<IonImg src="/hero.png" alt={caption} />\n', "Hero.tsx"), []);
+  assert.deepStrictEqual(altLines('<ion-img-viewer src="/hero.png" />\n'), []);
+});
+
 test("placeholder-label flags inputs that use a placeholder as their only label", () => {
   const rulesFor = (src) => scanSource(src, "a.tsx").map((f) => f.rule);
   // The issue's repro.
