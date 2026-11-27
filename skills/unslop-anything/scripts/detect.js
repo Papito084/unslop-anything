@@ -1377,13 +1377,13 @@ const rules = [
     family: "accessibility",
     severity: "noticeable",
     stacks: ["js", "web"],
-    message: "Click handler on a div or span. Keyboard and screen reader users cannot reach it.",
+    message: "Click handler on a non-interactive element such as a div, span or article. Keyboard and screen reader users cannot reach it.",
     fix: "Use a <button> for actions and an <a href> for navigation. They come with focus, Enter and Space, and the right role.",
     find({ code }) {
       const hits = [];
       // Each opening tag is read to its real end first, so an arrow function in an earlier
       // attribute (`onKeyDown={(e) => ...}`) does not hide the click handler after it.
-      for (const m of matches(/<(?:div|span|li|td|img|a)\b/, code)) {
+      for (const m of matches(/<(?:div|span|li|td|img|a|article|section)\b/, code)) {
         const end = tagEnd(code, m.index + m[0].length);
         const tag = code.slice(m.index, end === -1 ? undefined : end);
         // Only this element's own attributes: a nested element inside {...} is checked on its own.
