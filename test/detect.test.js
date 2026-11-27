@@ -1228,6 +1228,40 @@ test("focus-removed treats Tailwind v4 outline-hidden like outline-none", () => 
   assert.deepStrictEqual(rulesFor('<input className="focus-visible:outline-hidden focus-visible:ring-2" />\n'), []);
 });
 
+test("focus-removed flags outline: none and outline: 0 in JS/TS files (issue #225)", () => {
+  const lines = (src, file = "Field.tsx") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "focus-removed").map((f) => f.line);
+  // Issue #225 repro:
+  const repro = [
+    'import styled from "styled-components";',
+    "",
+    "export const Field = styled.input`",
+    "  outline: none;",
+    "`;",
+    "",
+    "export function Search() {",
+    '  return <input style={{ outline: "none" }} />;',
+    "}",
+  ].join("\n");
+  assert.deepStrictEqual(lines(repro), [4, 8]);
+
+  // Style objects with 'none' or 0
+  assert.deepStrictEqual(lines("<input style={{ outline: 'none' }} />\n"), [1]);
+  assert.deepStrictEqual(lines("<input style={{ outline: 0 }} />\n"), [1]);
+
+  // Files with focus-visible style stay quiet
+  const quietVisible = [
+    'import styled from "styled-components";',
+    "export const Field = styled.input`",
+    "  outline: none;",
+    "  &:focus-visible { outline: 2px solid blue; }",
+    "`;",
+  ].join("\n");
+  assert.deepStrictEqual(lines(quietVisible), []);
+
+  // Preserved outlines stay quiet
+  assert.deepStrictEqual(lines('<input style={{ outline: "2px solid #2563eb" }} />\n'), []);
+});
+
 test("nested-cards ignores dotted subcomponents and ion-card parts, still flags a real nested card", () => {
   const rulesFor = (src, file = "a.tsx") => scanSource(src, file).map((f) => f.rule);
   // Issue #65: dotted subcomponents of a single card are not nested cards.
