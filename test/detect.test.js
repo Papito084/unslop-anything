@@ -1255,6 +1255,20 @@ test("nested-cards flags Vuetify v-card and Angular Material mat-card nesting, n
   assert.deepStrictEqual(cardLines(matParts, "plans.component.html"), []);
 });
 
+test("nested-cards flags Quasar q-card and Element Plus el-card nesting, not their card parts (issue #228)", () => {
+  const cardLines = (src, file = "Plans.vue") => scanSource(src, file, { kind: "web" }).filter((f) => f.rule === "nested-cards").map((f) => [f.line, f.severity]);
+  // Issue #228 repro:
+  const quasar = '<template>\n  <q-card>\n    <q-card>Pro plan</q-card>\n  </q-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(quasar), [[2, "noticeable"]]);
+
+  const elementPlus = '<template>\n  <el-card>\n    <el-card>Pro plan</el-card>\n  </el-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(elementPlus), [[2, "noticeable"]]);
+
+  // Card parts inside one card stay quiet
+  const quasarParts = '<template>\n  <q-card>\n    <q-card-section>Pro</q-card-section>\n    <q-card-actions><q-btn label="Go" /></q-card-actions>\n  </q-card>\n</template>\n';
+  assert.deepStrictEqual(cardLines(quasarParts), []);
+});
+
 test("nested-cards reads opening tags with tagEnd so arrows or > in props do not misread sibling cards", () => {
   const rulesFor = (src, file = "a.tsx") => scanSource(src, file).filter((f) => f.rule === "nested-cards").map((f) => f.rule);
   assert.deepStrictEqual(rulesFor("<Card onClick={() => open()} />\n<Card><p>Second</p></Card>\n"), []);
