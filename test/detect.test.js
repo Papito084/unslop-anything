@@ -1982,6 +1982,17 @@ test("sparkle-icon flags Font Awesome's wand-magic-sparkles, not the plain wand"
   assert.deepStrictEqual(sparkleLines('<FontAwesomeIcon icon="wand-magic" />\n'), []);
 });
 
+test("sparkle-icon flags Font Awesome's faSparkles and fa-sparkles (issue #267)", () => {
+  const sparkleLines = (src) => scanSource(src, "Ai.tsx").filter((f) => f.rule === "sparkle-icon").map((f) => f.line);
+  assert.deepStrictEqual(sparkleLines('import { faSparkles } from "@fortawesome/pro-solid-svg-icons";\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-sparkles" />\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('<i class="fa-sparkles text-lg"></i>\n'), [1]);
+  assert.deepStrictEqual(sparkleLines('import { faStar } from "@fortawesome/free-solid-svg-icons";\n'), []);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-star" />\n'), []);
+  assert.deepStrictEqual(sparkleLines('const copy = "magic sparkles in the sky";\n'), []);
+  assert.deepStrictEqual(sparkleLines('<i className="fa-solid fa-wand-magic-sparkles" />\n'), [1]);
+});
+
 test("blankComments keeps slashes inside Swift raw strings and still finds later symbols", () => {
   const src = [
     'let label = #"A "// B"#',
